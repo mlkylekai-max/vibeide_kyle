@@ -1,7 +1,7 @@
 import * as z from 'zod/v4';
 import path from 'node:path';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { connectBrowser, getBrowserState } from '../browser.js';
+import { connectBrowser, getBrowserState, resetBrowserHandle } from '../browser.js';
 import { RUNTIME_DIRS } from '../paths.js';
 import { navigate, click, fill, scroll, wait, screenshot } from '../actions.js';
 import { extractCards, extractTable, extractText } from '../extract.js';
@@ -13,6 +13,21 @@ import { listWorkflowSummaries, loadWorkflow, saveWorkflow } from '../workflows.
 import type { ExtractConfig, PageAction } from '../types.js';
 
 export function registerBrowserTools(server: McpServer) {
+  const withBrowser = async <T>(fn: () => Promise<T>): Promise<T> => {
+    await connectBrowser();
+    try {
+      return await fn();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!/Target page|context or browser has been closed|Browser not connected|Session closed/i.test(message)) {
+        throw error;
+      }
+      resetBrowserHandle();
+      await connectBrowser();
+      return await fn();
+    }
+  };
+
   const runExtract = async (config: Pick<ExtractConfig, 'type' | 'selector' | 'maxRows' | 'maxChars'>): Promise<unknown> => {
     switch (config.type) {
       case 'cards':
@@ -52,9 +67,10 @@ export function registerBrowserTools(server: McpServer) {
     description: '导航到指定 URL',
     inputSchema: { url: z.string().describe('目标 URL') },
   }, async ({ url }) => {
-    await connectBrowser();
-    await navigate(url);
-    const state = await getBrowserState();
+    const state = await withBrowser(async () => {
+      await navigate(url);
+      return getBrowserState();
+    });
     return { content: [{ type: 'text', text: `已导航到: ${state.url} — ${state.title}` }] };
   });
 
@@ -62,8 +78,7 @@ export function registerBrowserTools(server: McpServer) {
     description: '点击匹配选择器的元素',
     inputSchema: { selector: z.string().describe('CSS 选择器') },
   }, async ({ selector }) => {
-    await connectBrowser();
-    await click(selector);
+    await withBrowser(() => click(selector));
     return { content: [{ type: 'text', text: `已点击: ${selector}` }] };
   });
 
@@ -74,8 +89,7 @@ export function registerBrowserTools(server: McpServer) {
       value: z.string().describe('填入的文字'),
     },
   }, async ({ selector, value }) => {
-    await connectBrowser();
-    await fill(selector, value);
+    await withBrowser(() => fill(selector, value));
     return { content: [{ type: 'text', text: `已在 ${selector} 填入: ${value}` }] };
   });
 
@@ -86,8 +100,7 @@ export function registerBrowserTools(server: McpServer) {
       pixels: z.number().optional().describe('滚动像素，默认 500'),
     },
   }, async ({ direction, pixels }) => {
-    await connectBrowser();
-    await scroll(direction, pixels);
+    await withBrowser(() => scroll(direction, pixels));
     return { content: [{ type: 'text', text: `已${direction === 'down' ? '向下' : '向上'}滚动 ${pixels ?? 500}px` }] };
   });
 
@@ -98,16 +111,14 @@ export function registerBrowserTools(server: McpServer) {
       timeoutMs: z.number().optional().describe('超时毫秒，默认 10000'),
     },
   }, async ({ selector, timeoutMs }) => {
-    await connectBrowser();
-    await wait(selector, timeoutMs);
+    await withBrowser(() => wait(selector, timeoutMs));
     return { content: [{ type: 'text', text: `元素已出现: ${selector}` }] };
   });
 
   server.registerTool('browser.screenshot', {
     description: '截取当前页面（返回 base64 PNG）',
   }, async () => {
-    await connectBrowser();
-    const b64 = await screenshot();
+    const b64 = await withBrowser(() => screenshot());
     return {
       content: [
         { type: 'text', text: '截图完成（见下图）' },
@@ -125,9 +136,8 @@ export function registerBrowserTools(server: McpServer) {
       maxChars: z.number().optional().describe('最大字符数，默认 12000'),
     },
   }, async ({ type, selector, maxRows, maxChars }) => {
-    await connectBrowser();
     const config = { type, selector, maxRows: maxRows ?? 50, maxChars: maxChars ?? 12000 } as const;
-    const result = await runExtract(config);
+    const result = await withBrowser(() => runExtract(config));
 
     return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
   });
@@ -135,17 +145,17 @@ export function registerBrowserTools(server: McpServer) {
   server.registerTool('browser.getState', {
     description: '获取当前浏览器状态（URL、标题）',
   }, async () => {
-    await connectBrowser();
-    const state = await getBrowserState();
+    const state = await withBrowser(() => getBrowserState());
     return { content: [{ type: 'text', text: `${state.title}\n${state.url}` }] };
   });
 
   server.registerTool('browser.recording_start', {
     description: '开始录制当前页面上的用户操作，供之后回放和沉淀工作流使用',
   }, async () => {
-    await connectBrowser();
-    await startRecord();
-    const state = await getBrowserState();
+    const state = await withBrowser(async () => {
+      await startRecord();
+      return getBrowserState();
+    });
     return { content: [{ type: 'text', text: `已开始录制：${state.title}\n${state.url}` }] };
   });
 
@@ -155,8 +165,7 @@ export function registerBrowserTools(server: McpServer) {
       label: z.string().optional().describe('录制名称，例如 bilibili-top10'),
     },
   }, async ({ label }) => {
-    await connectBrowser();
-    const actions = await stopRecord();
+    const actions = await withBrowser(() => stopRecord());
     const file = await saveRecording(actions, label ?? 'browser-recording');
     return {
       content: [{ type: 'text', text: `录制已保存: ${file}\n动作数: ${actions.length}` }],
@@ -177,9 +186,8 @@ export function registerBrowserTools(server: McpServer) {
       label: z.string().optional().describe('录制名片段，例如 bilibili-top10'),
     },
   }, async ({ file, label }) => {
-    await connectBrowser();
     const recording = await resolveRecording(file, label);
-    await replaySession(recording.actions);
+    await withBrowser(() => replaySession(recording.actions));
     return {
       content: [{ type: 'text', text: `已回放录制: ${recording.file}\n动作数: ${recording.actions.length}` }],
     };
@@ -198,8 +206,7 @@ export function registerBrowserTools(server: McpServer) {
       maxChars: z.number().optional().describe('默认最大字符数'),
     },
   }, async ({ name, recordingFile, recordingLabel, extractType, selector, workspace, maxRows, maxChars }) => {
-    await connectBrowser();
-    const state = await getBrowserState();
+    const state = await withBrowser(() => getBrowserState());
     const recording = await resolveRecording(recordingFile, recordingLabel);
     const file = await saveWorkflow({
       name,
@@ -234,15 +241,16 @@ export function registerBrowserTools(server: McpServer) {
       workspace: z.string().optional().describe('覆盖默认 workspace'),
     },
   }, async ({ name, workspace }) => {
-    await connectBrowser();
     const loaded = await loadWorkflow(name);
     if (!loaded) {
       throw new Error(`工作流不存在: ${name}`);
     }
 
     const actions = await loadRecording(loaded.workflow.recordingFile);
-    await replaySession(actions);
-    const result = await runExtract(loaded.workflow.extract);
+    const result = await withBrowser(async () => {
+      await replaySession(actions);
+      return runExtract(loaded.workflow.extract);
+    });
     const targetWorkspace = workspace ?? loaded.workflow.workspace;
     if (targetWorkspace) {
       await saveWorkspace(targetWorkspace, {

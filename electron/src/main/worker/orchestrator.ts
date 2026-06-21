@@ -6,9 +6,17 @@ import { buildContext } from './context';
 import { ChatBuffer, ParsedChunk } from './chat-buffer';
 import { logger } from './logger';
 import { isHtmlGameTask, validateCurrentPage } from './page-validator';
-import { appendClaudeSessionTurn, buildClaudeSessionContext, getClaudeSessionFile } from './session-store';
+import { appendClaudeSessionTurn, loadClaudeSession, getClaudeSessionFile } from './session-store';
 
 export type PushUIFn = (channel: string, data: unknown) => void;
+
+function shouldHideAgentNarration(content: string): boolean {
+  const text = content.trim();
+  if (!text) return true;
+  if (/[\u4e00-\u9fa5]/.test(text)) return false;
+  if (/^(File created|File updated|Done|Saved|Updated|Created|Opened|Navigated|Screenshot|Error)/i.test(text)) return false;
+  return /^(The user|I need|I should|I will|I'll|Let me|Now I|Actually|Wait,|Looking at|This means|Good,|Okay,|Hmm,|We need)/i.test(text);
+}
 
 export class Orchestrator {
   private mainWindow: BrowserWindow;
@@ -67,44 +75,21 @@ export class Orchestrator {
       this.state.start(task);
     }
 
-    this.pushUI('chat:message', {
-      text: `[Worker] 构建任务上下文...`,
-      timestamp: Date.now(),
-    });
-
     const effectiveTask = validationFeedback
       ? `${task}\n\n【上一版页面验收失败，必须修正后重新生成】\n${validationFeedback}`
       : task;
-    const sessionContext = buildClaudeSessionContext();
-    const taskForContext = `${sessionContext.text}\n${effectiveTask}`;
-    const { prompt, skillsFound } = buildContext(taskForContext);
+    const session = loadClaudeSession();
+    const { prompt, skillsFound } = buildContext(effectiveTask);
     logger.info('task:context', {
       skillsFound,
       promptLength: prompt.length,
-      sessionId: sessionContext.session.id,
-      sessionTurns: sessionContext.session.turnCount,
+      sessionId: session.id,
+      sessionTurns: session.turnCount,
       sessionFile: getClaudeSessionFile(),
       promptPreview: prompt.slice(0, 500),
     });
 
-    this.pushUI('chat:message', {
-      text: `[Session] ${sessionContext.session.id} · ${sessionContext.session.turnCount} 轮上下文已接入`,
-      timestamp: Date.now(),
-    });
-
-    if (skillsFound.length > 0) {
-      this.pushUI('chat:message', {
-        text: `[Worker] 已加载平台知识: ${skillsFound.join(', ')}`,
-        timestamp: Date.now(),
-      });
-    }
-
     this.state.advanceTo('running');
-
-    this.pushUI('chat:message', {
-      text: `[Agent] 启动中...`,
-      timestamp: Date.now(),
-    });
 
     const proc = this.ensurePersistentAgent();
     this.pendingTasks.push(task);
@@ -114,7 +99,7 @@ export class Orchestrator {
     this.startSilenceTimer();
 
     this.pushUI('chat:message', {
-      text: `[Agent] 使用 Claude Code PID ${proc.pid}`,
+      text: `[Agent] PID ${proc.pid}${skillsFound.length ? ` · ${skillsFound.join(', ')}` : ''}`,
       timestamp: Date.now(),
     });
 
@@ -343,9 +328,19 @@ export class Orchestrator {
       return;
     }
 
+    if (p.type === 'thinking') {
+      logger.debug('ui:push', { channel: 'chat:message', type: p.type, content: p.content.slice(0, 300), hidden: true });
+      return;
+    }
+
     const isError = p.type === 'error';
     if (p.content) {
       this.currentAgentTranscript += `${p.content}\n`;
+    }
+
+    if (p.type === 'text' && shouldHideAgentNarration(p.content)) {
+      logger.debug('ui:push', { channel: 'chat:message', type: p.type, content: p.content.slice(0, 300), hidden: true });
+      return;
     }
 
     logger.debug('ui:push', { channel: 'chat:message', type: p.type, tool: p.toolName, content: p.content.slice(0, 300) });

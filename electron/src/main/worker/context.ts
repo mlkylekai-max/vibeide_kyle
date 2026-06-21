@@ -11,64 +11,53 @@ export interface TaskContext {
   skillsFound: string[];
 }
 
+export function buildAgentSystemPrompt(): string {
+  const rules = readRules();
+  return [
+    '你是 vibeide 内置的常驻编码 Agent，运行在 Electron App 旁边。',
+    '',
+    '核心目标：用户在左侧对话，右侧 BrowserView/Chrome 区域显示结果。你要像 CLI 交互版一样保持上下文，少说废话，多直接执行。',
+    '',
+    '硬性规则：',
+    '1. 不要输出冗长推理过程。只输出必要状态、关键工具动作和最终结果。',
+    '2. 用户说“不要打开 / 先不打开 / 只写代码”时，只创建或修改文件，禁止 browser.navigate，禁止截图验收。',
+    '3. 用户说“打开 / 运行 / 看效果”时，才使用 browser.navigate 打开对应文件或页面。',
+    '4. 所有浏览器操作必须走 MCP browser.* 工具，禁止用系统 Chrome、Playwright 脚本、curl/wget 替代。',
+    '5. browser.* 报 Target closed 时，先重试 browser.getState 或 browser.navigate；不要立刻要求用户重开 Electron。',
+    '6. 写 HTML/小游戏时，默认保存到 agent/ 目录；若用户要求打开，必须在 Electron BrowserView 内打开并截图自检。',
+    '7. 生成游戏要有开始页、清晰角色/目标/操作提示、响应式尺寸，不能只有黑底小画布。',
+    '8. 文件路径和结果说明要简短明确。',
+    '',
+    rules ? `项目附加规则：\n${rules}` : '',
+  ].filter(Boolean).join('\n');
+}
+
 export function buildContext(task: string): TaskContext {
   const startTime = Date.now();
-  const rules = readRules();
   const { content: skillsContent, files: skillsFound } = readSkills(task);
 
-  logger.info('task:context', {
-    task: task.slice(0, 200),
-    rulesLength: rules.length,
+    logger.info('task:context', {
+      task: task.slice(0, 200),
     skillsCount: skillsFound.length,
     skillsFound,
   });
 
-  const gameRules = isHtmlGameTask(task)
-    ? [
-        '',
-        '【HTML 游戏专项验收】',
-        'A. 页面必须在 Electron BrowserView 内看起来像完整成品，不是黑底里一个小方块',
-        'B. 主游戏区域必须明显铺开：目标是宽度接近视口 70% 以上，高度接近视口 60% 以上',
-        'C. 默认先显示开始页 / 开始按钮 / 按键开始，禁止一加载就自动死亡或 game over',
-        'D. 不要只写固定像素画布再让 body 居中；必须给外层容器和 canvas 做响应式缩放',
-        'E. 完成后必须 navigate 到 file:// 页面并截图验收；如果截图里画面太小、黑边过大、或出现失败文本，继续修改，不要直接结束',
-      ].join('\n')
-    : '';
-
   const platformRules = buildPlatformRules(task);
+  const shouldNotOpen = /(不要打开|先不打开|不用打开|别打开|只写|先写)/i.test(task);
+  const wantsOpen = /(打开|运行|看效果|预览|截图)/i.test(task) && !shouldNotOpen;
 
   const prompt = [
-    `【任务】${task}`,
+    `【当前任务】${task}`,
     '',
-    '【规则 — 必须遵守，违反会导致任务失败】',
-    rules,
-    '0. ⚠️ 如果存在 WaitForMcpServers 工具，你的第一步必须先调用它，等 MCP 就绪',
-    '1. MCP 就绪后，第一批浏览器操作必须是 browser.navigate 或 browser.getState，不是写脚本/读文件',
-    '2. 所有浏览器操作必须通过 MCP 工具完成：browser.navigate / browser.click / browser.fill / browser.screenshot / browser.extract / browser.getState',
-    '3. ⛔ 不要创建脚本文件来操作浏览器 ⛔ 不要用 Bash ⛔ 不要用 curl/wget ⛔ 不要调用系统浏览器或 Chrome',
-    '4. 如果找不到某个 button/link，先用 browser.screenshot 确认页面状态——不要自己猜',
-    '5. 如果任务是写网页/小游戏，允许把 HTML/CSS/JS 保存到 agent/ 目录，但保存后必须用 browser.navigate(file://绝对路径) 在 Electron 内打开',
-    '6. 如果任务是 HTML 游戏，必须做成响应式布局，尽量铺满 BrowserView；禁止大黑边、小画布、开局即失败',
-    '7. 生成 HTML 游戏后，必须先截图自检；如果截图显示黑边过大、布局太小、或一打开就失败，继续修正后再结束',
-    '8. 如果 MCP 工具不可用，立即报告错误并停止，不要改用 Bash / Playwright / Chrome 顶替',
-    '9. 回复尽量简短，重点放在执行任务上',
-    '10. 默认不要点击可能触发新窗口/新标签页/独立详情页的元素；优先用 browser.navigate 在当前页完成跳转',
-    '11. 每次关键跳转后立刻 browser.getState，确认当前 URL 仍在用户要求的平台和正确路径内',
-    '12. 只要任务包含搜索/查找/整理结果意图，必须先执行平台 URL 工具生成 URL：优先 node tools/build_platform_search_url.mjs <platform> "<关键词>"；如果在 Linux/macOS 且 Node 工具不可用，再用 tools/build_platform_search_url.sh；然后 browser.navigate；禁止先打开首页自己摸索',
+    shouldNotOpen ? '【执行模式】只写文件/代码，不打开、不截图。' : '',
+    wantsOpen ? '【执行模式】打开或运行当前目标，必要时截图确认。' : '',
+    isHtmlGameTask(task)
+      ? '【HTML 游戏要求】必须有可见角色/目标/开始页/操作提示；画面响应式铺开；若打开后截图发现角色不可见或布局异常，直接修复再汇报。'
+      : '',
     platformRules,
-    gameRules,
     '',
-    '【操作流程 — 按顺序执行】',
-    'Step 0: WaitForMcpServers() — 等 MCP 工具就绪（如果该工具存在）',
-    'Step 1: browser.getState() — 确认当前浏览器状态',
-    'Step 2: browser.navigate({ url: "目标网址" }) — 打开页面',
-    'Step 3: browser.screenshot() — 确认页面加载成功',
-    'Step 4: browser.fill / browser.click — 执行采集操作',
-    'Step 5: browser.extract — 提取数据',
-    '',
-    skillsContent ? `\n【平台知识】\n${skillsContent}` : '',
-    `\n【可用的 Skills】${skillsFound.length ? skillsFound.join(', ') : '(无)'}`,
-  ].join('\n');
+    skillsContent ? `【本轮相关知识】\n${skillsContent}` : '',
+  ].filter(Boolean).join('\n');
 
   logger.debug('task:context', {
     totalPromptLength: prompt.length,

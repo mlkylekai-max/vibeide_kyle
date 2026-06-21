@@ -35,25 +35,43 @@ function isSystemPage(url: string): boolean {
   );
 }
 
+function isPageUsable(candidate: Page | null): candidate is Page {
+  return !!candidate && !candidate.isClosed();
+}
+
+function isContextUsable(candidate: BrowserContext | null): candidate is BrowserContext {
+  return !!candidate && candidate.pages().some((p) => !p.isClosed());
+}
+
+export function resetBrowserHandle(): void {
+  page = null;
+  context = null;
+  if (!browser?.isConnected()) {
+    browser = null;
+  }
+}
+
 /** Find the BrowserView page — the one the user actually sees */
 function findBrowserViewPage(pages: Page[]): Page | null {
+  const usablePages = pages.filter((p) => !p.isClosed());
+
   // Priority 1: a page with a real URL (not system, not blank)
-  const active = pages.find(p => !isSystemPage(p.url()));
+  const active = usablePages.find(p => !isSystemPage(p.url()));
   if (active) return active;
 
   // Priority 2: about:blank (BrowserView initial state)
-  const blank = pages.find(p => p.url() === 'about:blank');
+  const blank = usablePages.find(p => p.url() === 'about:blank');
   if (blank) return blank;
 
   // Priority 3: first non-renderer, non-devtools page
-  const fallback = pages.find(p =>
+  const fallback = usablePages.find(p =>
     !p.url().includes('renderer/index.html') &&
     !p.url().startsWith('devtools://')
   );
   if (fallback) return fallback;
 
   // Last resort: first page
-  return pages[0] || null;
+  return usablePages[0] || null;
 }
 
 export async function connectBrowser(cdpPort?: number): Promise<{ browser: Browser; context: BrowserContext; page: Page }> {
@@ -67,7 +85,7 @@ export async function connectBrowser(cdpPort?: number): Promise<{ browser: Brows
     page = null;
   }
 
-  if (browser && context && page) {
+  if (browser && context && isPageUsable(page)) {
     // Verify page is still alive
     try {
       const currentUrl = page.url();
@@ -81,21 +99,26 @@ export async function connectBrowser(cdpPort?: number): Promise<{ browser: Brows
     }
   }
 
-  browser = await tryConnectCDP(port);
+  if (!browser) {
+    browser = await tryConnectCDP(port);
+  }
 
   if (!browser) {
     throw new Error(`无法连接 CDP :${port}，Electron 是否已启动？(CDP_PORT=${process.env.CDP_PORT || '未设置'})`);
   }
 
   const contexts = browser.contexts();
-  if (contexts.length > 0) {
+  if (!isContextUsable(context)) {
+    context = null;
+  }
+
+  if (!context && contexts.length > 0) {
     context = contexts[0];
-  } else {
+  } else if (!context) {
     context = await browser.newContext({ viewport: { width: 1440, height: 1200 } });
   }
 
-  const pages = context.pages();
-  page = findBrowserViewPage(pages);
+  page = findBrowserViewPage(context.pages());
 
   if (!page) {
     page = await context.newPage();
@@ -107,19 +130,11 @@ export async function connectBrowser(cdpPort?: number): Promise<{ browser: Brows
 }
 
 export async function closeBrowser(): Promise<void> {
-  if (page) { page = null; }
-  if (context) {
-    try { await context.close(); } catch { /* already closed */ }
-    context = null;
-  }
-  if (browser) {
-    try { await browser.close(); } catch { /* already closed */ }
-    browser = null;
-  }
+  resetBrowserHandle();
 }
 
 export async function getBrowserState(): Promise<{ url: string; title: string }> {
-  if (!page) throw new Error('Browser not connected');
+  if (!isPageUsable(page)) throw new Error('Browser not connected');
   return {
     url: page.url() || '',
     title: await page.title(),
@@ -127,7 +142,7 @@ export async function getBrowserState(): Promise<{ url: string; title: string }>
 }
 
 export function getPage(): Page {
-  if (!page) throw new Error('Browser not connected. Call connectBrowser() first.');
+  if (!isPageUsable(page)) throw new Error('Browser not connected. Call connectBrowser() first.');
   return page;
 }
 

@@ -14,6 +14,7 @@ import {
   isDev,
   isPackaged,
 } from './paths';
+import { buildAgentSystemPrompt } from './worker/context';
 
 const AGENT_DIR = getAgentDir();
 const CLAUDE_BIN = getClaudeBin();
@@ -45,12 +46,14 @@ export function ensureAgentProcess(): ChildProcess {
     mcpConfigPath = tmpPath;
   }
 
+  const systemPrompt = buildAgentSystemPrompt();
   const args = [
     '-p',
     '--mcp-config', mcpConfigPath,
     '--dangerously-skip-permissions',
     '--input-format', 'stream-json',
     '--output-format', 'stream-json',
+    '--append-system-prompt', systemPrompt,
     '--verbose',
     '--replay-user-messages',
   ];
@@ -66,6 +69,8 @@ export function ensureAgentProcess(): ChildProcess {
       'stream-json',
       '--output-format',
       'stream-json',
+      '--append-system-prompt',
+      `(${systemPrompt.length} chars)`,
       '--verbose',
       '--replay-user-messages',
     ],
