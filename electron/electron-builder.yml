@@ -1,0 +1,77 @@
+appId: com.coffecat.app
+productName: coffecat
+artifactName: "${productName}-${version}-${os}-${arch}.${ext}"
+
+directories:
+  output: dist-package
+
+files:
+  - dist/**/*
+  - package.json
+
+extraResources:
+  - from: ../agent
+    to: agent
+    filter:
+      - "**/*"
+      - "!logs/**"
+      - "!screenshots/**"
+      - "!recordings/**"
+      - "!*.html"
+      - "!*.png"
+      - "!node_modules/.cache/**"
+      - "!node_modules/@anthropic-ai/claude-code/**/node_modules/.cache/**"
+  - from: ../apikey.txt
+    to: apikey.txt
+  - from: ../runtime/dist
+    to: runtime/dist
+  - from: ../runtime/package.json
+    to: runtime/package.json
+  - from: ../runtime/node_modules
+    to: runtime/node_modules
+    filter:
+      - "**/*"
+      - "!**/.cache/**"
+  - from: ../scripts
+    to: scripts
+    filter:
+      - "**/*"
+      - "!__pycache__/**"
+  - from: ../config
+    to: config
+  - from: ../_bundled/nodejs
+    to: runtime/nodejs
+  - from: ../_bundled/python
+    to: runtime/python
+  - from: ../_bundled/playwright
+    to: runtime/playwright
+
+asarUnpack:
+  - "**/agent/**"
+  - "**/runtime/**"
+  - "**/scripts/**"
+  - "**/config/**"
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  requestedExecutionLevel: asInvoker
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+
+linux:
+  target:
+    - AppImage
+    - deb
+
+mac:
+  category: public.app-category.developer-tools
+  target:
+    - dmg
+    - zip

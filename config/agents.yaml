@@ -1,0 +1,10 @@
+agents:
+  data_agent:
+    enabled: true
+    role: "清洗采集结果并输出 MVP 结构化摘要"
+  browser_agent:
+    enabled: false
+    role: "后续接入页面理解和动作建议"
+  coding_agent:
+    enabled: false
+    role: "后续接入 Claude Code / OpenCode"

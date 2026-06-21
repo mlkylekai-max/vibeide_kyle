@@ -1,0 +1,12 @@
+platforms:
+  douyin:
+    login_check: "人工登录后由 profile 持久化保存"
+    notes:
+      - "MVP 先走独立 profile，不直接做 cookie 注入"
+      - "关键节点保留人工接管"
+  tiktok:
+    login_check: "待接入"
+  taobao:
+    login_check: "待接入"
+  "1688":
+    login_check: "待接入"

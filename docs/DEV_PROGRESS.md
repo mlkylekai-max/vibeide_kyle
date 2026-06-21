@@ -1,0 +1,102 @@
+# 开发进度
+
+> 以当前代码为准。
+
+---
+
+## 当前版本
+
+`0.3.x` 开发中
+
+---
+
+## 当前已落地
+
+- [x] GitHub 仓库 `git@github.com:howtio/vibeide.git` 已作为目标源码仓库接入本机
+- [x] 已从 Windows `C:\vibecodingide` 同步源码镜像到本机，排除依赖、构建产物、运行态和密钥
+- [x] README 已重写为 `vibeide` 当前 Electron + Runtime + Agent 主线
+- [x] 新文档体系已建立：INDEX / ARCHITECTURE / DEVELOPMENT / GITHUB_SYNC / REFACTOR_PLAN / SECURITY / HANDOFF
+- [x] Electron 33 + Vite 6 + React 18
+- [x] Gateway / Worker / Agent / Runtime 四层分工
+- [x] CDP 端口统一 `9230`
+- [x] Agent 流式输出
+- [x] 右侧原生浏览器区迁移到 `WebContentsView`
+- [x] 右侧浏览器区支持多 tab
+- [x] `window.open` / `_blank` 收成右侧 tab
+- [x] 快捷任务：B 站搜索、股票搜索、贪吃蛇
+- [x] 搜索任务提示词开始强制走 URL 工具
+- [x] 通用搜索工具：`agent/tools/build_platform_search_url.mjs` / `agent/tools/build_platform_search_url.sh`
+- [x] Runtime CLI 入口：`health / mcp / connect`
+- [x] Runtime 卡片提取、录制、回放对齐参考代码主链路
+- [x] Runtime 工作流持久化：录制 + 提取规则可保存成可复用流程
+- [x] Python 辅助脚本：`scripts/normalize.py`、`scripts/reporter.py`
+- [x] Electron 启动脚本补齐 runtime 状态目录初始化与健康检查
+- [x] Electron 右侧浏览器区登录态改为持久化保存到 `runtime/chrome_profile/electron-shell`
+- [x] Electron 右侧浏览器区录制/回放按钮可直接使用，录制结果保存到 `runtime/recordings/`
+- [x] Agent 可直接通过 MCP 开始录制、停止录制、列出录制、回放录制、保存工作流、执行工作流
+- [x] 右侧改成固定工作台主页 + 可切换浏览页层
+- [x] 原生浏览页宿主改为跟随 renderer 实际可视容器尺寸同步
+- [x] 原生浏览页宿主无有效 renderer bounds 时保持隐藏，避免首轮导航贴错位置
+- [x] Worker 层搜索预处理：搜索 / 整理 / 排行任务会在 Agent 启动前先导航到明确平台的搜索结果页
+- [x] Electron 右侧录制工具支持命名保存、按名字/文件选择重放，工作台展示录制/工作流摘要
+- [x] Agent 增加回放优化 workflow skill，明确录制 / workflow / workspace / tools 的文件位置和复用方式
+- [x] `windows1.0` 支线开始 Windows 启动与打包适配
+- [x] 增加 Docker + Wine Windows 打包 smoke 测试入口
+- [x] `agent/tools` 长期工具补齐 Windows `.cmd` / 跨平台 `.mjs` 入口
+
+---
+
+## 当前架构现状
+
+```text
+Electron Window
+├── 左侧 36%：Chat + Progress + Result
+└── 右侧：Workbench + Browser Pages
+    ├── 工作台主页（文件 / 工具 / 录制 / 重放）
+    └── WebContentsView tabs
+```
+
+```text
+UI -> Gateway -> Worker -> Agent -> MCP -> Runtime -> Electron Chromium
+```
+
+---
+
+## 当前文档已同步
+
+- [README.md](../README.md)
+- [docs/INDEX.md](INDEX.md)
+- [docs/ARCHITECTURE.md](ARCHITECTURE.md)
+- [docs/DEVELOPMENT.md](DEVELOPMENT.md)
+- [docs/GITHUB_SYNC.md](GITHUB_SYNC.md)
+- [docs/REFACTOR_PLAN.md](REFACTOR_PLAN.md)
+- [docs/SECURITY.md](SECURITY.md)
+- [docs/HANDOFF.md](HANDOFF.md)
+- [docs/12_Docker_Windows_Smoke.md](12_Docker_Windows_Smoke.md)
+- [docs/LOG.md](LOG.md)
+- [docs/DEV_PROGRESS.md](DEV_PROGRESS.md)
+
+---
+
+## 当前已知问题
+
+1. 代码、package、UI 文案和部分路径注释仍含 `coffecat/coddecat` 旧命名，需要按 `docs/REFACTOR_PLAN.md` 分阶段统一。
+2. `tests/test_scaffold.py` 仍依赖旧 Python scaffold `src/coddecat`，与当前 Electron 主线不一致。
+3. Windows 原目录 `C:\vibecodingide` 还不是 Git clone 目录，后续应改为从 GitHub pull。
+4. `WebContentsView` 在 Linux/X11 下已增加无有效 bounds 隐藏保护，但仍需继续实机压测位置稳定性。
+5. Worker 层已接入统一搜索预处理，但平台识别仍应随新增平台继续扩展和压测。
+6. 个别 agent 规则文本仍使用旧词 `BrowserView`，语义上指的是“右侧浏览页层”。
+7. `pytest tests/` 当前仍因仓库缺少 `src/coddecat` 实现而在收集阶段失败，不属于本轮 runtime 改动回归。
+8. Runtime 录制/回放已接进 Electron 和 Agent，Electron UI 可命名和选择重放对象，但当前回放仍以 DOM 事件重放为主，复杂跨页流程还需继续压测。
+
+---
+
+## 下一步
+
+1. 先完成源码和文档首批入库并 push 到 GitHub。
+2. 按 `docs/REFACTOR_PLAN.md` 统一项目命名和测试口径。
+3. 继续压测 Worker 搜索预处理在更多平台、更多自然语言表达下的稳定性。
+4. 继续验证右侧 `workbench + host + tabs` 模型的稳定性。
+5. 给更多平台补统一搜索 URL 工具和专项 workflow。
+6. 继续增强录制/回放在真实业务站点上的稳定性，补充跨页和异常恢复。
+7. 给工作流增加版本和结果校验策略，避免复用旧选择器失效。

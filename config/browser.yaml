@@ -1,0 +1,9 @@
+executable_path: "runtime/browser_runtime/chrome"
+user_data_dir: "runtime/chrome_profile"
+debug_port: 9222
+headless: false
+startup_urls: []
+extra_args:
+  - "--disable-first-run-ui"
+  - "--disable-default-apps"
+  - "--remote-allow-origins=*"

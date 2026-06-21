@@ -1,0 +1,5 @@
+app_name: "coddecat"
+log_level: "INFO"
+runtime_dir: "runtime"
+workplaces_dir: "workplaces"
+docs_dir: "docs"

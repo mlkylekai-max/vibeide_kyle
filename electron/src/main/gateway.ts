@@ -1,0 +1,111 @@
+import { ipcMain, BrowserWindow } from 'electron';
+import { handleTask, getOrchestrator } from './worker';
+import { activateTab, closeTab, listTabs, setBrowserTabsEmitter, setBrowserViewBoundsFromRenderer } from './browser-view';
+import { listBrowserRecordingSummaries, listBrowserRecordings, replayBrowserRecording, replayLatestBrowserRecording, startBrowserRecording, stopBrowserRecording } from './browser-recorder';
+import { getWorkbenchOverview } from './workbench';
+
+export function startGateway(mainWindow: BrowserWindow): void {
+  // Gateway 提供 pushUI 能力 — Worker 通过它推消息到 UI
+  const pushUI = (channel: string, data: unknown) => {
+    mainWindow.webContents.send(channel, data);
+  };
+
+  setBrowserTabsEmitter((tabs) => {
+    mainWindow.webContents.send('browser:tabs', { tabs });
+  });
+
+  const orch = getOrchestrator(mainWindow, pushUI);
+
+  // 聊天 — 委托 Worker
+  ipcMain.handle('chat:send', async (_event, text: string) => {
+    orch.handleTask(text);
+    return { ok: true };
+  });
+
+  // 任务控制 — 委托 Worker
+  ipcMain.handle('task:pause', async () => {
+    orch.pause();
+    return { ok: true };
+  });
+
+  ipcMain.handle('task:resume', async () => {
+    orch.resume();
+    return { ok: true };
+  });
+
+  ipcMain.handle('task:stop', async () => {
+    orch.stop();
+    return { ok: true };
+  });
+
+  // 浏览器控制 — 委托 Worker
+  ipcMain.handle('browser:navigate', async (_event, url: string) => {
+    orch.navigateBrowser(url);
+    return { ok: true };
+  });
+
+  ipcMain.handle('browser:getState', async () => {
+    return orch.getBrowserState();
+  });
+
+  ipcMain.handle('browser:setBounds', async (_event, bounds: { x: number; y: number; width: number; height: number }) => {
+    setBrowserViewBoundsFromRenderer(bounds);
+    return { ok: true };
+  });
+
+  ipcMain.handle('browser:listTabs', async () => {
+    return { tabs: listTabs() };
+  });
+
+  ipcMain.handle('workbench:getOverview', async () => {
+    return getWorkbenchOverview();
+  });
+
+  ipcMain.handle('browser:activateTab', async (_event, id: string) => {
+    activateTab(id);
+    return { ok: true };
+  });
+
+  ipcMain.handle('browser:closeTab', async (_event, id: string) => {
+    closeTab(id);
+    return { ok: true };
+  });
+
+  ipcMain.handle('browser:startRecording', async () => {
+    await startBrowserRecording();
+    return { ok: true };
+  });
+
+  ipcMain.handle('browser:stopRecording', async (_event, label?: string) => {
+    const result = await stopBrowserRecording(label || 'browser-recording');
+    return { ok: true, ...result };
+  });
+
+  ipcMain.handle('browser:replayLatestRecording', async () => {
+    try {
+      const result = await replayLatestBrowserRecording();
+      return { ok: true, ...result };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return { ok: false, error: message };
+    }
+  });
+
+  ipcMain.handle('browser:replayRecording', async (_event, target?: string) => {
+    try {
+      const result = await replayBrowserRecording(target);
+      return { ok: true, ...result };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return { ok: false, error: message };
+    }
+  });
+
+  ipcMain.handle('browser:listRecordings', async () => {
+    return { files: await listBrowserRecordings() };
+  });
+
+  ipcMain.handle('browser:listRecordingSummaries', async () => {
+    return { recordings: await listBrowserRecordingSummaries() };
+  });
+}

@@ -1,0 +1,11 @@
+{
+  "name": "@coffecat/agent",
+  "version": "0.2.0",
+  "private": true,
+  "dependencies": {
+    "@anthropic-ai/claude-code": "^2.1.167"
+  },
+  "optionalDependencies": {
+    "@anthropic-ai/claude-code-win32-x64": "^2.1.167"
+  }
+}
