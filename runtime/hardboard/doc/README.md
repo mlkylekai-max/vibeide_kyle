@@ -1,52 +1,41 @@
-# Hardboard Vibecoding 施工文档
+# Hardboard Vibecoding Agent Guide
 
-目标：把 vibeide 改造成 ESP-IDF 硬件 vibecoding 专用 IDE。左侧 Agent 负责写代码、解释过程、调用 ESP-IDF 工具；右侧 BrowserView 保留，用于打开文档、网页、HTML 调试页和工作台文件。
+vibeide 当前定位为 ESP-IDF 硬件 vibecoding IDE。Agent 写代码、调用 ESP-IDF、解释错误；右侧 BrowserView 用于文档、网页、工作台文件和调试页面。
 
-## 目录约定
+## 目录
 
-- `runtime/hardboard/esptools/`：ESP-IDF 和命令行工具。当前目标版本为 ESP-IDF 5.4.3。
-- `runtime/hardboard/example/`：按芯片和板型保存示例工程，当前先放 ESP32-S3 示例。
-- `runtime/hardboard/projects/`：Agent 生成、修改、编译、烧录的工作工程。
-- `runtime/hardboard/doc/`：施工文档、硬件引脚、设备记录、调试规范。
-- `runtime/hardboard/git-snapshots/`：本地 git 快照和回滚点。
-- `runtime/hardboard/firmware/`：可交付 bin/elf/map/烧录说明。
-- `runtime/hardboard/logs/`：编译、烧录、串口监视日志。
+- `runtime/hardboard/esptools/`：ESP-IDF 5.4.3、Python venv、CMake、Ninja、Xtensa 工具链。
+- `runtime/hardboard/example/esp32s3/`：ESP32-S3 示例，禁止直接当工作工程修改。
+- `runtime/hardboard/projects/`：工作工程目录，Agent 新建和修改代码放这里。
+- `runtime/hardboard/doc/`：施工说明和硬件设备记录。
+- `runtime/hardboard/git-snapshots/`：源码快照，改动前可调用 `hardboard.snapshot_create`。
+- `runtime/hardboard/firmware/`：固件归档目录。
+- `runtime/hardboard/logs/`：编译、烧录、串口日志目录。
 
-## ESP-IDF 标准流程
+## 默认硬件
 
-参考 Espressif 官方 ESP-IDF v5.4 Windows 开始工程文档：
+- 默认 target：`esp32s3`
+- 已验证设备端口：Windows `COM3`
+- 已验证芯片：ESP32-S3 QFN56 revision v0.2，8MB PSRAM，USB-Serial/JTAG
+- 已验证 ESP-IDF：5.4.3
 
-1. 确保 ESP-IDF 路径和工程路径没有空格。
-2. 从示例复制工程，例如 `examples/get-started/hello_world`。
-3. 进入工程目录。
-4. 执行 `idf.py set-target esp32s3`。
-5. 执行 `idf.py build`。
-6. 选择串口，例如 Windows 下的 `COM3`。
-7. 执行 `idf.py -p COM3 flash`。
+## 标准工作流
 
-在 vibeide 中，Agent 应通过 MCP 工具完成：
+1. `hardboard.env_status`
+2. 如要烧录：`hardboard.devices_list`
+3. 大改前：`hardboard.snapshot_create`
+4. 新工程或 target 不确定：`hardboard.idf_set_target`
+5. 编译：`hardboard.idf_build`
+6. 烧录：`hardboard.idf_flash`
+7. 需要清理时：`hardboard.idf_clean`
+8. 需要擦除芯片时：`hardboard.idf_erase_flash`
 
-```text
-hardboard.env_status
-hardboard.devices_list
-hardboard.idf_set_target
-hardboard.idf_build
-hardboard.idf_flash
-```
+## 验证事实
 
-## 当前 MVP 状态
+Windows `C:\vibeide` 下已完成：
 
-- 前端保留浏览器和工作台。
-- 原重放入口改为硬件设备选择、Build、Flash。
-- 浏览器录制/工作流底层代码暂时保留，不作为主入口。
-- Agent 会自动加载 `espidf_hardboard.md` skill。
-- Windows 打包会包含 `runtime/hardboard`，但完整 ESP-IDF 工具链体积较大，需要单独确认最终随包策略。
+- `npm --prefix runtime run smoke:hardboard` 通过，输出 `hardboard build smoke ok`。
+- `hardboard.idf_flash` 对 `COM3` 烧录 hello_world 成功。
+- `electron/dist-package/win-unpacked/vibeide.exe` 和 `electron/dist-package/vibeide-0.3.0-win-x64.exe` 已生成。
 
-## 下一步
-
-1. 把本机 ESP-IDF 5.4.3 复制或镜像到 `runtime/hardboard/esptools/esp-idf-v5.4.3/esp-idf`。
-2. 排查本机 `idf.py set-target esp32s3` 在 cmake 配置阶段长时间无输出的问题。
-3. 补齐 Windows Python、CMake、Ninja、Xtensa/RISC-V toolchain 缓存。
-4. 用 Claude Code 真实调用 `hardboard.idf_build` 编译 ESP32-S3 示例工程。
-5. 在 Windows 上检测用户已插入的 ESP32-S3 串口并测试烧录。
-6. 接入串口 monitor 和日志保存。
+不要假装编译或烧录成功。只有 hardboard 工具返回 exitCode 0，才可以报告成功。

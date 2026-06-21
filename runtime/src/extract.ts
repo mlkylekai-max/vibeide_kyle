@@ -1,5 +1,5 @@
-import { getPage } from './browser';
-import type { CardDetailConfig, CardDetailSectionConfig, CardPaginationConfig, ExtractConfig } from './types';
+import { getPage } from './browser.js';
+import type { CardDetailConfig, CardDetailSectionConfig, CardPaginationConfig, ExtractConfig } from './types.js';
 
 function cleanText(value: string): string {
   return value.replace(/\s+/g, ' ').trim();

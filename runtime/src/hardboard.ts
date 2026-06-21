@@ -22,6 +22,12 @@ export interface HardboardCommandResult {
   stderr: string;
 }
 
+export interface HardboardSnapshotResult {
+  projectDir: string;
+  snapshotDir: string;
+  filesCopied: number;
+}
+
 export interface HardboardEnvStatus {
   runtimeRoot: string;
   hardboardRoot: string;
@@ -34,6 +40,9 @@ export interface HardboardEnvStatus {
   examplesDir: string;
   projectsDir: string;
   docsDir: string;
+  snapshotsDir: string;
+  firmwareDir: string;
+  logsDir: string;
 }
 
 export function getHardboardEnvStatus(version = DEFAULT_IDF_VERSION): HardboardEnvStatus {
@@ -52,6 +61,9 @@ export function getHardboardEnvStatus(version = DEFAULT_IDF_VERSION): HardboardE
     examplesDir: RUNTIME_DIRS.hardboardExamples,
     projectsDir: RUNTIME_DIRS.hardboardProjects,
     docsDir: RUNTIME_DIRS.hardboardDocs,
+    snapshotsDir: RUNTIME_DIRS.hardboardSnapshots,
+    firmwareDir: RUNTIME_DIRS.hardboardFirmware,
+    logsDir: RUNTIME_DIRS.hardboardLogs,
   };
 }
 
@@ -115,6 +127,48 @@ export async function runIdfFlash(projectDir: string, port: string, version = DE
   return runIdfCommand(resolveProjectDir(projectDir), ['-p', port, 'flash'], version);
 }
 
+export async function runIdfEraseFlash(projectDir: string, port: string, version = DEFAULT_IDF_VERSION): Promise<HardboardCommandResult> {
+  if (!port.trim()) throw new Error('缺少串口端口，例如 COM3 或 /dev/ttyUSB0');
+  return runIdfCommand(resolveProjectDir(projectDir), ['-p', port, 'erase-flash'], version);
+}
+
+export async function runIdfClean(projectDir: string, version = DEFAULT_IDF_VERSION): Promise<HardboardCommandResult> {
+  return runIdfCommand(resolveProjectDir(projectDir), ['fullclean'], version);
+}
+
+export function createHardboardSnapshot(projectDir: string, label = ''): HardboardSnapshotResult {
+  const resolvedProjectDir = resolveProjectDir(projectDir);
+  if (!fs.existsSync(resolvedProjectDir)) {
+    throw new Error(`ESP-IDF 项目目录不存在: ${resolvedProjectDir}`);
+  }
+
+  const projectName = path.basename(resolvedProjectDir);
+  const safeLabel = label.trim().replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/^-+|-+$/g, '');
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const snapshotDir = path.join(
+    RUNTIME_DIRS.hardboardSnapshots,
+    `${stamp}-${projectName}${safeLabel ? `-${safeLabel}` : ''}`,
+  );
+  fs.mkdirSync(snapshotDir, { recursive: true });
+
+  let filesCopied = 0;
+  copyProjectSnapshot(resolvedProjectDir, snapshotDir, () => {
+    filesCopied += 1;
+  });
+
+  fs.writeFileSync(path.join(snapshotDir, 'SNAPSHOT.md'), [
+    `# ${projectName} snapshot`,
+    '',
+    `- Source: ${resolvedProjectDir}`,
+    `- Created: ${new Date().toISOString()}`,
+    `- Label: ${safeLabel || '(none)'}`,
+    `- Files copied: ${filesCopied}`,
+    '',
+  ].join('\n'), 'utf-8');
+
+  return { projectDir: resolvedProjectDir, snapshotDir, filesCopied };
+}
+
 export async function runIdfCommand(projectDir: string, args: string[], version = DEFAULT_IDF_VERSION): Promise<HardboardCommandResult> {
   const resolvedProjectDir = path.resolve(projectDir || RUNTIME_DIRS.hardboardProjects);
   if (!fs.existsSync(resolvedProjectDir)) {
@@ -158,6 +212,24 @@ export async function runIdfCommand(projectDir: string, args: string[], version 
       stdout: err.stdout ?? '',
       stderr: err.stderr ?? err.message,
     };
+  }
+}
+
+function copyProjectSnapshot(sourceDir: string, targetDir: string, onFile: () => void): void {
+  const ignoredDirs = new Set(['build', '.git', 'managed_components', '.cache']);
+  for (const entry of fs.readdirSync(sourceDir, { withFileTypes: true })) {
+    if (entry.isDirectory() && ignoredDirs.has(entry.name)) continue;
+    const source = path.join(sourceDir, entry.name);
+    const target = path.join(targetDir, entry.name);
+    if (entry.isDirectory()) {
+      fs.mkdirSync(target, { recursive: true });
+      copyProjectSnapshot(source, target, onFile);
+      continue;
+    }
+    if (entry.isFile()) {
+      fs.copyFileSync(source, target);
+      onFile();
+    }
   }
 }
 

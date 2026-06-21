@@ -1,5 +1,5 @@
-import { getContext, getPage } from './browser';
-import type { PageAction } from './types';
+import { getContext, getPage } from './browser.js';
+import type { PageAction } from './types.js';
 
 const RECORDER_SCRIPT = `
 (() => {

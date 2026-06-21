@@ -1,4 +1,4 @@
-import { getPage } from './browser';
+import { getPage } from './browser.js';
 
 export async function navigate(url: string): Promise<void> {
   const page = getPage();

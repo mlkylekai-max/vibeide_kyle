@@ -5,16 +5,26 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { ensureRuntimeState, RUNTIME_DIRS } from './paths.js';
 
-export { connectBrowser, closeBrowser, getBrowserState } from './browser';
-export { navigate, click, fill, scroll, wait, screenshot } from './actions';
-export { extractCards, extractTable, extractText } from './extract';
-export { startRecord, stopRecord } from './record';
-export { replaySession } from './replay';
-export { saveRecording, loadRecording, loadLatestRecording, listRecordings } from './recordings';
-export { saveWorkspace, readWorkspace, listWorkspaces } from './storage';
-export { saveWorkflow, loadWorkflow, listWorkflows } from './workflows';
-export { startMCPServer } from './mcp/server';
-export { getHardboardEnvStatus, listHardboardDevices, runIdfBuild, runIdfFlash, runIdfSetTarget, runIdfCommand } from './hardboard';
+export { connectBrowser, closeBrowser, getBrowserState } from './browser.js';
+export { navigate, click, fill, scroll, wait, screenshot } from './actions.js';
+export { extractCards, extractTable, extractText } from './extract.js';
+export { startRecord, stopRecord } from './record.js';
+export { replaySession } from './replay.js';
+export { saveRecording, loadRecording, loadLatestRecording, listRecordings } from './recordings.js';
+export { saveWorkspace, readWorkspace, listWorkspaces } from './storage.js';
+export { saveWorkflow, loadWorkflow, listWorkflows } from './workflows.js';
+export { startMCPServer } from './mcp/server.js';
+export {
+  createHardboardSnapshot,
+  getHardboardEnvStatus,
+  listHardboardDevices,
+  runIdfBuild,
+  runIdfClean,
+  runIdfCommand,
+  runIdfEraseFlash,
+  runIdfFlash,
+  runIdfSetTarget,
+} from './hardboard.js';
 
 async function runCli(): Promise<void> {
   const command = process.argv[2] ?? 'health';
@@ -55,6 +65,28 @@ async function runCli(): Promise<void> {
   if (command === 'hardboard:devices') {
     const { listHardboardDevices } = await import('./hardboard.js');
     console.log(JSON.stringify(await listHardboardDevices(), null, 2));
+    return;
+  }
+
+  if (command === 'hardboard:snapshot') {
+    const { createHardboardSnapshot } = await import('./hardboard.js');
+    console.log(JSON.stringify(createHardboardSnapshot(process.argv[3] || RUNTIME_DIRS.hardboardProjects, process.argv[4] || ''), null, 2));
+    return;
+  }
+
+  if (command === 'hardboard:build') {
+    const { runIdfBuild } = await import('./hardboard.js');
+    const result = await runIdfBuild(process.argv[3] || RUNTIME_DIRS.hardboardProjects, process.argv[4]);
+    console.log(JSON.stringify(result, null, 2));
+    process.exitCode = result.exitCode;
+    return;
+  }
+
+  if (command === 'hardboard:flash') {
+    const { runIdfFlash } = await import('./hardboard.js');
+    const result = await runIdfFlash(process.argv[3] || RUNTIME_DIRS.hardboardProjects, process.argv[4] || '', process.argv[5]);
+    console.log(JSON.stringify(result, null, 2));
+    process.exitCode = result.exitCode;
     return;
   }
 

@@ -113,6 +113,9 @@
 - `hardboard.idf_set_target(projectDir?, target?)` — 设置 ESP-IDF target
 - `hardboard.idf_build(projectDir?)` — 编译 ESP-IDF 工程
 - `hardboard.idf_flash(projectDir?, port)` — 烧录 ESP-IDF 工程
+- `hardboard.idf_clean(projectDir?)` — 清理 ESP-IDF 工程 build 产物
+- `hardboard.idf_erase_flash(projectDir?, port)` — 擦除指定串口设备 Flash
+- `hardboard.snapshot_create(projectDir?, label?)` — 创建本地源码快照，便于回滚
 
 ### 文件系统
 - `skills/*.md` — 可读（平台采集知识）
@@ -129,10 +132,11 @@
 5. 如果发现新平台或有用的页面结构，更新 `skills/` 下的 md
 6. 如果需要新的辅助脚本，优先写 `tools/` 下的跨平台 `.mjs`；需要平台包装时同时补 `.cmd` 和 `.sh`
 7. 不要修改 `CLAUDE.md` 本身
-8. 不要动 `../runtime/` `../electron/` `../scripts/` 下的代码
-9. 不要读 `../docs/` 目录
-10. 用户指定了平台时，禁止跨平台搜索“替代结果”
-11. 优先选择站内搜索页、排序页、列表页完成任务，少点会打开详情页/主页/播放页的元素
+8. 可以读 `../runtime/hardboard/doc/` 和 `../docs/HARDBOARD_CONSTRUCTION.md` 来理解硬件工作流
+9. 可以在 `../runtime/hardboard/projects/` 下创建和修改 ESP-IDF 工程；不要直接改 `../runtime/hardboard/example/` 原始示例
+10. 不要擅自修改 `../runtime/src/`、`../electron/`、`../scripts/` 等平台代码，除非用户明确要求维护 IDE 本身
+11. 用户指定了平台时，禁止跨平台搜索“替代结果”
+12. 优先选择站内搜索页、排序页、列表页完成任务，少点会打开详情页/主页/播放页的元素
 
 ## 遇到错误时
 

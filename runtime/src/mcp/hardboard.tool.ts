@@ -1,9 +1,12 @@
 import * as z from 'zod/v4';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import {
+  createHardboardSnapshot,
   getHardboardEnvStatus,
   listHardboardDevices,
   runIdfBuild,
+  runIdfClean,
+  runIdfEraseFlash,
   runIdfFlash,
   runIdfSetTarget,
 } from '../hardboard.js';
@@ -58,6 +61,40 @@ export function registerHardboardTools(server: McpServer) {
     },
   }, async ({ projectDir, port, version }) => {
     const result = await runIdfFlash(projectDir || RUNTIME_DIRS.hardboardProjects, port, version);
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+  });
+
+  server.registerTool('hardboard.idf_clean', {
+    description: '对 ESP-IDF 工程执行 idf.py fullclean，清理 build 产物',
+    inputSchema: {
+      projectDir: z.string().optional().describe(`ESP-IDF 项目目录；默认 ${RUNTIME_DIRS.hardboardProjects}`),
+      version: z.string().optional().describe('ESP-IDF 版本，默认 5.4.3'),
+    },
+  }, async ({ projectDir, version }) => {
+    const result = await runIdfClean(projectDir || RUNTIME_DIRS.hardboardProjects, version);
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+  });
+
+  server.registerTool('hardboard.idf_erase_flash', {
+    description: '对指定串口连接的 ESP32 设备执行 idf.py erase-flash',
+    inputSchema: {
+      projectDir: z.string().optional().describe(`ESP-IDF 项目目录；默认 ${RUNTIME_DIRS.hardboardProjects}`),
+      port: z.string().describe('串口端口，例如 COM3、COM8、/dev/ttyUSB0'),
+      version: z.string().optional().describe('ESP-IDF 版本，默认 5.4.3'),
+    },
+  }, async ({ projectDir, port, version }) => {
+    const result = await runIdfEraseFlash(projectDir || RUNTIME_DIRS.hardboardProjects, port, version);
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+  });
+
+  server.registerTool('hardboard.snapshot_create', {
+    description: '复制 ESP-IDF 工程源码到 runtime/hardboard/git-snapshots，排除 build/.git 等产物，便于本地回滚',
+    inputSchema: {
+      projectDir: z.string().optional().describe(`ESP-IDF 项目目录；默认 ${RUNTIME_DIRS.hardboardProjects}`),
+      label: z.string().optional().describe('快照标签，例如 before-led-change'),
+    },
+  }, async ({ projectDir, label }) => {
+    const result = createHardboardSnapshot(projectDir || RUNTIME_DIRS.hardboardProjects, label || '');
     return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
   });
 }

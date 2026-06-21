@@ -1,38 +1,59 @@
 # ESP-IDF Hardboard Vibecoding
 
-本 skill 用于 ESP32 / ESP32-S3 / ESP32-C3 硬件开发、编译、烧录、串口设备选择和本地工程维护。
+用于 ESP32 / ESP32-S3 / ESP32-C3 硬件开发、编译、烧录、串口设备选择和本地工程维护。
 
 ## 默认环境
 
 - 默认 ESP-IDF 版本：5.4.3。
-- 默认硬件资源根目录：`runtime/hardboard`。
-- 示例工程目录：`runtime/hardboard/example`。
-- Agent 可工作的工程目录：`runtime/hardboard/projects`。
-- 施工文档和硬件记录：`runtime/hardboard/doc`。
-- 本地回滚快照：`runtime/hardboard/git-snapshots`。
+- 默认 target：`esp32s3`。
+- 硬件根目录：`runtime/hardboard`。
+- 示例目录：`runtime/hardboard/example`。
+- 工作工程目录：`runtime/hardboard/projects`。
+- Agent 可读文档：`runtime/hardboard/doc`。
+- 本地快照目录：`runtime/hardboard/git-snapshots`。
+
+## 先读资料
+
+硬件任务开始时先读：
+
+1. `runtime/hardboard/doc/README.md`
+2. `runtime/hardboard/doc/device-profile-esp32s3.md`
+
+如果任务涉及官方流程，可在右侧 BrowserView 打开 Espressif 文档，但不要用网页步骤替代 hardboard 工具。
 
 ## 标准调用顺序
 
-1. 先调用 `hardboard.env_status`，确认 `idfPath`、`idfPy`、`python` 是否存在。
-2. 如果需要烧录，调用 `hardboard.devices_list`，让用户确认串口；Windows 串口通常是 `COM3`、`COM8` 这种格式。
-3. 新工程或目标不确定时，先调用 `hardboard.idf_set_target`，默认 target 为 `esp32s3`。
-4. 编译调用 `hardboard.idf_build`。
-5. 烧录调用 `hardboard.idf_flash`，必须传入 `port`。
+1. `hardboard.env_status`：确认 `idfPath`、`idfPy`、`python`、`idfToolsPath`。
+2. `hardboard.devices_list`：烧录前列出串口；Windows 串口通常为 `COM3`、`COM8`。
+3. `hardboard.snapshot_create`：大改或用户要求可回滚时，先创建源码快照。
+4. `hardboard.idf_set_target`：新工程或 target 不确定时执行，默认 `esp32s3`。
+5. `hardboard.idf_build`：编译。
+6. `hardboard.idf_flash`：烧录，必须传入真实端口。
+7. `hardboard.idf_clean`：需要清理构建缓存时执行。
+8. `hardboard.idf_erase_flash`：用户明确要求擦除芯片时执行。
 
-## ESP-IDF 官方流程约束
+## 工程规则
 
-参考 Espressif ESP-IDF v5.4 Windows start project 文档：
+- 不要直接修改 `runtime/hardboard/example/**`；先复制到 `runtime/hardboard/projects/<project-name>`。
+- 不要把工程放到带空格路径。
+- 修改 ESP-IDF 工程时重点检查：
+  - 顶层 `CMakeLists.txt`
+  - `main/CMakeLists.txt`
+  - `main/*.c` / `main/*.cpp`
+  - `sdkconfig.defaults`
+  - 组件依赖和 `idf_component_register`
+- 编译失败先读 hardboard 工具返回的 `stderr/stdout`，再改代码。
 
-- ESP-IDF 路径和工程路径不要包含空格。
-- 可从 `%IDF_PATH%\examples\get-started\hello_world` 复制工程作为起点。
-- 进入工程目录后先执行 `idf.py set-target esp32s3`，再执行 build/flash。
-- `menuconfig` 只在需要改配置时使用；hello_world 默认配置可跳过。
+## 成功标准
 
-## Agent 行为规则
+- “写好了”只代表文件已创建。
+- “编译通过”必须来自 `hardboard.idf_build` exitCode 0。
+- “烧录成功”必须来自 `hardboard.idf_flash` exitCode 0，并且输出包含写入和校验信息。
+- 不能因为生成了代码或看起来合理就报告硬件验证成功。
 
-- 不要用系统外部 IDE 替代 MCP hardboard 工具。
-- 不要假装烧录成功；必须展示 `hardboard.idf_flash` 的结果。
-- 编译失败时，先读错误摘要，定位 `CMakeLists.txt`、`sdkconfig.defaults`、`main/*` 或组件依赖，再修改。
-- 修改工程前，优先在 `runtime/hardboard/projects/<project-name>` 下创建或复制工程。
-- 大改前在 `runtime/hardboard/git-snapshots` 建本地 git 快照或说明当前状态。
-- 如果用户只要求写代码，不要烧录；如果用户要求“编译测试”，必须实际调用 `hardboard.idf_build`。
+## 已验证基线
+
+- Windows `C:\vibeide` 下 ESP-IDF 5.4.3 可用。
+- `runtime/hardboard/projects/hello_world_esp32s3` 已完成 set-target/build。
+- ESP32-S3 板子在 `COM3` 烧录成功。
+- 打包产物已生成 `win-unpacked` 和 `vibeide-0.3.0-win-x64.exe`。
