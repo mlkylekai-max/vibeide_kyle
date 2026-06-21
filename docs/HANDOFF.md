@@ -41,18 +41,18 @@
   - `_bundled`
   - `apikey.txt`
 
-## 当前待接力事项
+## 当前验证状态
 
 - `log.txt` 复盘出的文档定位、文件扫描、源码文件名猜测、MCP build 输出过大问题已经落到 hardboard skill、runtime compact output 和文档规则里。
 - Windows 已能重新打包出 `奥德赛0.0` 产物，打包名已从用户视角统一。
-- 最近一次打包版 `hardboard:build hardboard\projects\wifi_connect_fmai` 验证了 compact JSON 输出正常，但编译失败在 Xtensa GCC C++ multilib include：
-
-```text
-fatal error: bits/c++config.h: No such file or directory
-```
-
-- 这个问题不要当成业务源码错误。下一位接力应先清理 packaged 工程 `build` 后复测；如果仍失败，修 runtime 的 toolchain include 注入，或临时在工程顶层 `CMakeLists.txt` 对 C++ 编译追加 `xtensa-esp-elf/include/c++/14.2.0/xtensa-esp-elf/esp32s3/no-rtti`，然后重新打包并跑 packaged build。
-- 用户最新要求是“先不用继续，去修文档”，所以本文档记录当前真实状态，不宣称 packaged hardboard build/flash 已最终通过。
+- 打包版 `hardboard:build hardboard\projects\wifi_connect_fmai` 已通过，返回 compact JSON：
+  - `exitCode: 0`
+  - `ok: true`
+  - `stdoutBytes` 约 150KB，但只返回 `stdoutTail` 和 `stdoutLogPath`，不会再把超长输出塞回 Agent。
+- 之前的 `bits/c++config.h` / `bits/stl_iterator_base_types.h` 问题已通过 runtime target-aware `CPLUS_INCLUDE_PATH` 注入修复。
+- 打包版 `hardboard:flash hardboard\projects\wifi_connect_fmai COM3` 已通过，ESP32-S3 写入和 hash verified 成功。
+- 打包版 `hardboard:serial COM3 8 115200` 已抓到连续 `sin:<number>` 数据，可用于 IDE 串口监视器曲线测试。
+- Windows 工作区仍有一个本地未提交文件：`runtime/hardboard/projects/wifi_connect_fmai/main/wifi_connect_main.c`。这是硬件测试固件内容，不要用 `git checkout --` 覆盖；如需入库，先阅读再决定是否提交。
 
 ## 接力操作手册
 
