@@ -215,11 +215,13 @@ function buildIdfEnv(idfPath: string, version: string): NodeJS.ProcessEnv {
   const oldPath = process.env.PATH || '';
   const pythonBin = idfPythonEnvPath ? path.join(idfPythonEnvPath, process.platform === 'win32' ? 'Scripts' : 'bin') : '';
   const installedToolPaths = discoverInstalledIdfToolPaths(idfToolsPath);
+  const espRomElfDir = resolveEspRomElfDir(idfToolsPath);
   return {
     ...process.env,
     IDF_PATH: idfPath,
     IDF_TOOLS_PATH: idfToolsPath,
     ...(idfPythonEnvPath ? { IDF_PYTHON_ENV_PATH: idfPythonEnvPath } : {}),
+    ...(espRomElfDir ? { ESP_ROM_ELF_DIR: espRomElfDir } : {}),
     IDF_PYTHON_CHECK_CONSTRAINTS: 'no',
     ESP_IDF_VERSION: version,
     VIBEIDE_HARDBOARD_ROOT: RUNTIME_DIRS.hardboard,
@@ -271,6 +273,33 @@ function discoverInstalledIdfToolPaths(idfToolsPath: string): string[] {
   }
 
   return [...paths];
+}
+
+function resolveEspRomElfDir(idfToolsPath: string): string | null {
+  const root = path.join(idfToolsPath, 'tools', 'esp-rom-elfs');
+  if (!fs.existsSync(root)) return null;
+
+  const candidates: string[] = [];
+  const queue: Array<{ dir: string; depth: number }> = [{ dir: root, depth: 0 }];
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (!current) continue;
+    let entries: fs.Dirent[];
+    try {
+      entries = fs.readdirSync(current.dir, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    if (entries.some((entry) => entry.isFile() && entry.name.endsWith('.elf'))) {
+      candidates.push(current.dir);
+    }
+    if (current.depth >= 3) continue;
+    for (const entry of entries) {
+      if (entry.isDirectory()) queue.push({ dir: path.join(current.dir, entry.name), depth: current.depth + 1 });
+    }
+  }
+  candidates.sort((a, b) => b.length - a.length);
+  return candidates[0] ?? null;
 }
 
 function resolveIdfToolsPath(): string {
