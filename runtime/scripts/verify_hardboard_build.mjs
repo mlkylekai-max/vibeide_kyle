@@ -1,7 +1,10 @@
 import { getHardboardEnvStatus, listHardboardDevices, runIdfBuild, runIdfSetTarget } from '../dist/hardboard.js';
+import fs from 'node:fs';
+import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const projectDir = fileURLToPath(new URL('../hardboard/projects/hello_world_esp32s3', import.meta.url));
+fs.rmSync(path.join(projectDir, 'build'), { recursive: true, force: true });
 
 const env = getHardboardEnvStatus();
 console.log('hardboard env:', JSON.stringify(env, null, 2));
