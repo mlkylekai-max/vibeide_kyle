@@ -209,15 +209,6 @@ export default function App() {
 
   return (
     <div className="app">
-      <header className="app-header">
-        <div className="app-brand">
-          <span className="app-icon-pixel" aria-hidden="true" />
-          <span className="app-title">vibeide</span>
-        </div>
-        <span className="app-status nes-badge">
-          <span className="is-primary">Runtime OK</span>
-        </span>
-      </header>
       <div className="app-body">
         <div className="left-panel">
           <ChatPanel messages={messages} onSend={handleSend} />

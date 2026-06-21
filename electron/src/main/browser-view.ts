@@ -143,8 +143,6 @@ export function activateTab(id: string): void {
 }
 
 export function closeTab(id: string): void {
-  if (tabs.length <= 1) return;
-
   const index = tabs.findIndex((tab) => tab.id === id);
   if (index < 0) return;
 
@@ -158,7 +156,13 @@ export function closeTab(id: string): void {
     tab.view.webContents.close({ waitForBeforeUnload: false });
   }
 
-  if (activeTabId === id) {
+  if (tabs.length === 0) {
+    const fallback = createTabEntry('about:blank');
+    tabs.push(fallback);
+    activeTabId = fallback.id;
+    attachActiveTab();
+    setBrowserViewBounds();
+  } else if (activeTabId === id) {
     const fallback = tabs[Math.max(0, index - 1)] ?? tabs[0] ?? null;
     activeTabId = fallback?.id ?? null;
     attachActiveTab();

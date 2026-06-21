@@ -137,7 +137,6 @@ export default function BrowserPanel({
     onCloseTab(tabId);
   };
 
-  const browserTitle = selectedTab?.title || activeTab?.title || '浏览页';
   const replayOptions = recordings.map((recording) => ({
     value: recording.file,
     label: `${recording.label || recording.file}${recording.actionCount == null ? '' : ` · ${recording.actionCount} 动作`}`,
@@ -179,7 +178,6 @@ export default function BrowserPanel({
           ))}
         </div>
         <div className="browser-switcher">
-          <span>页面</span>
           <div className="browser-switcher-controls">
             <select className="nes-select" value={selectedViewId} onChange={(e) => handleSelectView(e.target.value)}>
               <option value={WORKBENCH_VIEW_ID}>工作台 / 对话页</option>
@@ -196,7 +194,7 @@ export default function BrowserPanel({
               disabled={!selectedTab}
               title="关闭当前页面"
             >
-              关闭页
+              关
             </button>
           </div>
         </div>
@@ -207,7 +205,6 @@ export default function BrowserPanel({
       ) : (
         <>
           <div className="browser-toolbar nes-container is-rounded">
-            <span className="browser-label">{browserTitle}</span>
             <form onSubmit={handleNavigate}>
               <input
                 className="nes-input"
@@ -227,9 +224,9 @@ export default function BrowserPanel({
                 placeholder="录制名"
               />
               {isRecording ? (
-                <button className="nes-btn is-error" type="button" onClick={() => onStopRecording(recordingName.trim())}>Stop Rec</button>
+                <button className="nes-btn is-error" type="button" onClick={() => onStopRecording(recordingName.trim())}>Stop</button>
               ) : (
-                <button className="nes-btn is-success" type="button" onClick={() => onStartRecording(recordingName.trim())}>Start Rec</button>
+                <button className="nes-btn is-success" type="button" onClick={() => onStartRecording(recordingName.trim())}>Rec</button>
               )}
               <select
                 className="nes-select"
@@ -251,10 +248,9 @@ export default function BrowserPanel({
               />
               <button className="nes-btn is-warning" type="button" onClick={() => onReplayRecording(replayTarget.trim())}>Play</button>
               <button type="button" className="browser-ghost-button nes-btn" onClick={() => handleSelectView(WORKBENCH_VIEW_ID)}>
-                返回工作台
+                台
               </button>
             </div>
-            <span className="browser-current-url">{url}</span>
           </div>
           <div className="browser-recording-status nes-container is-rounded">{recordingSummary}</div>
           <div ref={browserStageRef} className="browser-stage">
