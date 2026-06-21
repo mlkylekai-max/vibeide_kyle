@@ -16,6 +16,7 @@ runtime/recordings/
 runtime/workflows/
 runtime/claude-session/
 runtime/claude-config/
+runtime/agent-workspace/
 runtime/hardboard/**/build/
 runtime/hardboard/**/managed_components/
 runtime/hardboard/**/dependencies.lock
