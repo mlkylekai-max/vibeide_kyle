@@ -2,7 +2,7 @@
 
 ## 目标
 
-把 vibeide 重构为硬件 vibecoding 专用 IDE：
+把奥德赛0.0 重构为硬件 vibecoding 专用 IDE：
 
 - 左侧 Agent 负责写 ESP-IDF 代码、解释步骤、调用工具、处理编译/烧录错误。
 - 右侧 BrowserView 保留，用于打开乐鑫文档、GitHub、工作台文件和调试页面。
@@ -39,7 +39,7 @@ runtime/hardboard/
 5. 选择串口，例如 Windows 下 `COM3`。
 6. 执行 `idf.py -p COM3 flash`。
 
-vibeide 对应工具：
+奥德赛0.0 对应工具：
 
 ```text
 hardboard.env_status
@@ -94,6 +94,40 @@ node dist\index.js hardboard:build hardboard\projects\wifi_connect_fmai
 hardboardRoot = C:\Users\HP\AppData\Local\vibeide-hardboard-runtime\hardboard
 ```
 
+## log.txt 复盘出的已修复问题
+
+### Agent 文档定位错误
+
+日志里 Agent 试图读取：
+
+```text
+runtime-data\agent-workspace\..\runtime\hardboard\doc\README.md
+```
+
+这个路径错误，因为 Agent 默认 cwd 不是仓库根目录。规则已改为：硬件任务先调用 `hardboard.env_status`，再读取返回的 `docsDir`。
+
+### 文件扫描扫进 build 产物
+
+日志里直接 `find <project> -type f`，输出被 `build/**` 放大到几十万字符。规则已改为：
+
+```bash
+find <project> -path '*/build' -prune -o -type f -print
+```
+
+或者只读取 `CMakeLists.txt`、`main/CMakeLists.txt`、`main/*`。
+
+### 源码文件名猜错
+
+日志里 Agent 先找 `main/main.c`，但真实源码由 `main/CMakeLists.txt` 的 `SRCS` 指向 `wifi_connect_main.c`。规则已改为：修改 ESP-IDF 工程前必须先读 `main/CMakeLists.txt`。
+
+### MCP build 输出过大
+
+日志里 `hardboard.idf_build` 返回 15 万字符，触发 Claude 工具结果溢出。runtime 已改为：
+
+- 完整 stdout/stderr 写入 `runtime/hardboard/logs/*.log`。
+- MCP 和 CLI 返回 compact JSON：`exitCode`、`ok`、`cwd`、`stdoutLogPath`、`stderrLogPath`、`stdoutTail`、`stderrTail`、`stdoutBytes`、`stderrBytes`。
+- Agent 不再需要读取 Claude 自己保存的超长 tool-result 文件。
+
 ## 已验证状态
 
 - Windows 仓库：`C:\vibeide`。
@@ -113,9 +147,9 @@ hardboardRoot = C:\Users\HP\AppData\Local\vibeide-hardboard-runtime\hardboard
   - bootloader、app、partition table 均 hash verified。
 - `hardboard.serial_capture` 用于 SSH/Agent 下非交互读取串口日志，替代需要 TTY 的 `idf.py monitor`。
 - Windows 打包已通过：
-  - `electron/dist-package/win-unpacked/vibeide.exe`
-  - `electron/dist-package/vibeide-0.3.0-win-x64.exe`
-  - `electron/dist-package/vibeide-0.3.0-win-x64.exe.blockmap`
+  - `electron/dist-package/win-unpacked/奥德赛0.0.exe`
+  - `electron/dist-package/奥德赛0.0-0.3.0-win-x64.exe`
+  - `electron/dist-package/奥德赛0.0-0.3.0-win-x64.exe.blockmap`
 - 打包版 runtime 相对路径编译已通过：
   - 命令：`node dist\index.js hardboard:build hardboard\projects\wifi_connect_fmai`
   - `cwd`：`%LOCALAPPDATA%\vibeide-hardboard-runtime\hardboard\projects\wifi_connect_fmai`
@@ -135,12 +169,14 @@ hardboardRoot = C:\Users\HP\AppData\Local\vibeide-hardboard-runtime\hardboard
 - `IDF_PYTHON_CHECK_CONSTRAINTS=no`
 - `PATH`：自动追加 Python venv、ESP-IDF tools、已安装工具链 bin 目录。
 
-Windows 打包配置包含 `runtime/hardboard`，但排除 ESP-IDF 自带 `examples/**`，避免 NSIS/7zip 处理 Unix 脚本路径时报错。vibeide 自己的 `runtime/hardboard/example/**` 保留。
+Windows 打包配置包含 `runtime/hardboard`，但排除 ESP-IDF 自带 `examples/**`，避免 NSIS/7zip 处理 Unix 脚本路径时报错。奥德赛0.0 自己的 `runtime/hardboard/example/**` 保留。
 
 ## Agent 开发规则
 
 - 硬件任务先读 `agent/skills/espidf_hardboard.md`。
+- `agent/skills/espidf_hardboard.md` 已写明：先 `hardboard.env_status`，用返回的 `docsDir/projectsDir`，不要猜当前 cwd。
 - 新工程放在 `runtime/hardboard/projects/<project-name>`，不要直接改原始 example。
+- 查工程文件必须排除 `build/**`，并先读 `main/CMakeLists.txt` 定位真实源码。
 - 大改前调用 `hardboard.snapshot_create`。
 - 编译必须调用 `hardboard.idf_build`；烧录必须调用 `hardboard.devices_list` 后再 `hardboard.idf_flash`。
 - 用户要求“测试运行/联网/板子情况”时，烧录后必须调用 `hardboard.serial_capture` 或等价串口日志采集。

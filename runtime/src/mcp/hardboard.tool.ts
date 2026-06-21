@@ -3,6 +3,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import {
   createHardboardSnapshot,
   getHardboardEnvStatus,
+  type HardboardCommandResult,
   listHardboardDevices,
   runIdfBuild,
   runIdfClean,
@@ -12,6 +13,8 @@ import {
   runSerialCapture,
 } from '../hardboard.js';
 import { RUNTIME_DIRS } from '../paths.js';
+
+const OUTPUT_TAIL_CHARS = 6000;
 
 export function registerHardboardTools(server: McpServer) {
   server.registerTool('hardboard.env_status', {
@@ -38,7 +41,7 @@ export function registerHardboardTools(server: McpServer) {
     },
   }, async ({ projectDir, version }) => {
     const result = await runIdfBuild(projectDir || RUNTIME_DIRS.hardboardProjects, version);
-    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+    return { content: [{ type: 'text', text: JSON.stringify(compactCommandResult(result), null, 2) }] };
   });
 
   server.registerTool('hardboard.idf_set_target', {
@@ -50,7 +53,7 @@ export function registerHardboardTools(server: McpServer) {
     },
   }, async ({ projectDir, target, version }) => {
     const result = await runIdfSetTarget(projectDir || RUNTIME_DIRS.hardboardProjects, target || 'esp32s3', version);
-    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+    return { content: [{ type: 'text', text: JSON.stringify(compactCommandResult(result), null, 2) }] };
   });
 
   server.registerTool('hardboard.idf_flash', {
@@ -62,7 +65,7 @@ export function registerHardboardTools(server: McpServer) {
     },
   }, async ({ projectDir, port, version }) => {
     const result = await runIdfFlash(projectDir || RUNTIME_DIRS.hardboardProjects, port, version);
-    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+    return { content: [{ type: 'text', text: JSON.stringify(compactCommandResult(result), null, 2) }] };
   });
 
   server.registerTool('hardboard.idf_clean', {
@@ -73,7 +76,7 @@ export function registerHardboardTools(server: McpServer) {
     },
   }, async ({ projectDir, version }) => {
     const result = await runIdfClean(projectDir || RUNTIME_DIRS.hardboardProjects, version);
-    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+    return { content: [{ type: 'text', text: JSON.stringify(compactCommandResult(result), null, 2) }] };
   });
 
   server.registerTool('hardboard.idf_erase_flash', {
@@ -85,7 +88,7 @@ export function registerHardboardTools(server: McpServer) {
     },
   }, async ({ projectDir, port, version }) => {
     const result = await runIdfEraseFlash(projectDir || RUNTIME_DIRS.hardboardProjects, port, version);
-    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+    return { content: [{ type: 'text', text: JSON.stringify(compactCommandResult(result), null, 2) }] };
   });
 
   server.registerTool('hardboard.serial_capture', {
@@ -111,4 +114,25 @@ export function registerHardboardTools(server: McpServer) {
     const result = createHardboardSnapshot(projectDir || RUNTIME_DIRS.hardboardProjects, label || '');
     return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
   });
+}
+
+function compactCommandResult(result: HardboardCommandResult) {
+  return {
+    command: result.command,
+    cwd: result.cwd,
+    exitCode: result.exitCode,
+    ok: result.exitCode === 0,
+    logPath: result.logPath,
+    stdoutLogPath: result.stdoutLogPath,
+    stderrLogPath: result.stderrLogPath,
+    stdoutBytes: Buffer.byteLength(result.stdout || '', 'utf-8'),
+    stderrBytes: Buffer.byteLength(result.stderr || '', 'utf-8'),
+    stdoutTail: tailText(result.stdout || ''),
+    stderrTail: tailText(result.stderr || ''),
+  };
+}
+
+function tailText(value: string): string {
+  if (value.length <= OUTPUT_TAIL_CHARS) return value;
+  return `[truncated: showing last ${OUTPUT_TAIL_CHARS} chars of ${value.length}]\n${value.slice(-OUTPUT_TAIL_CHARS)}`;
 }

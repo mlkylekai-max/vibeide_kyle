@@ -4,6 +4,7 @@
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { ensureRuntimeState, RUNTIME_DIRS } from './paths.js';
+import type { HardboardCommandResult } from './hardboard.js';
 
 export { connectBrowser, closeBrowser, getBrowserState } from './browser.js';
 export { navigate, click, fill, scroll, wait, screenshot } from './actions.js';
@@ -78,7 +79,7 @@ async function runCli(): Promise<void> {
   if (command === 'hardboard:build') {
     const { runIdfBuild } = await import('./hardboard.js');
     const result = await runIdfBuild(process.argv[3] || RUNTIME_DIRS.hardboardProjects, process.argv[4]);
-    console.log(JSON.stringify(result, null, 2));
+    console.log(JSON.stringify(compactCommandResult(result), null, 2));
     process.exitCode = result.exitCode;
     return;
   }
@@ -86,7 +87,7 @@ async function runCli(): Promise<void> {
   if (command === 'hardboard:flash') {
     const { runIdfFlash } = await import('./hardboard.js');
     const result = await runIdfFlash(process.argv[3] || RUNTIME_DIRS.hardboardProjects, process.argv[4] || '', process.argv[5]);
-    console.log(JSON.stringify(result, null, 2));
+    console.log(JSON.stringify(compactCommandResult(result), null, 2));
     process.exitCode = result.exitCode;
     return;
   }
@@ -114,4 +115,26 @@ if (import.meta.url === entryHref) {
     console.error(`[vibeide] runtime 启动失败: ${message}`);
     process.exit(1);
   });
+}
+
+function compactCommandResult(result: HardboardCommandResult) {
+  return {
+    command: result.command,
+    cwd: result.cwd,
+    exitCode: result.exitCode,
+    ok: result.exitCode === 0,
+    logPath: result.logPath,
+    stdoutLogPath: result.stdoutLogPath,
+    stderrLogPath: result.stderrLogPath,
+    stdoutBytes: Buffer.byteLength(result.stdout || '', 'utf-8'),
+    stderrBytes: Buffer.byteLength(result.stderr || '', 'utf-8'),
+    stdoutTail: tailText(result.stdout || ''),
+    stderrTail: tailText(result.stderr || ''),
+  };
+}
+
+function tailText(value: string): string {
+  const limit = 6000;
+  if (value.length <= limit) return value;
+  return `[truncated: showing last ${limit} chars of ${value.length}]\n${value.slice(-limit)}`;
 }

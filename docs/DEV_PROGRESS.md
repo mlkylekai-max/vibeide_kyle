@@ -6,15 +6,15 @@
 
 ## 当前版本
 
-`0.3.x` 开发中
+奥德赛0.0 / 内部版本 `0.3.x` 开发中
 
 ---
 
 ## 当前已落地
 
 - [x] GitHub 仓库 `git@github.com:howtio/vibeide.git` 已作为目标源码仓库接入本机
-- [x] 已从 Windows `C:\vibecodingide` 同步源码镜像到本机，排除依赖、构建产物、运行态和密钥
-- [x] README 已重写为 `vibeide` 当前 Electron + Runtime + Agent 主线
+- [x] 已从 Windows `C:\vibeide` 同步源码镜像到本机，排除依赖、构建产物、运行态和密钥
+- [x] README 已重写为奥德赛0.0 当前 Electron + Runtime + Agent 主线，`vibeide` 保留为仓库和内部工程代号
 - [x] 新文档体系已建立：INDEX / ARCHITECTURE / DEVELOPMENT / GITHUB_SYNC / REFACTOR_PLAN / SECURITY / HANDOFF
 - [x] Claude CLI 已接入软件级持续会话上下文，最近轮次持久化到 `runtime/claude-session/`
 - [x] Claude CLI 启动增加 `--continue` 续接策略，并用 prompt 注入作为兜底
@@ -24,7 +24,7 @@
 - [x] 新增 Claude 软件会话记忆烟测：`cd electron && npm run verify:session`
 - [x] Windows `C:\vibeide` 已从 GitHub clone 到提交 `8746cca` 并通过构建 / 会话 / 工作台点击烟测
 - [x] 应用图标已新增像素风 `electron/assets/icon.svg/png/ico`
-- [x] 打包规则已改为 `vibeide` appId/productName/icon，并停止把真实 `apikey.txt` 打进安装包
+- [x] 打包规则已改为奥德赛0.0 productName/icon，并停止把真实 `apikey.txt` 打进安装包
 - [x] runtime/electron/agent package 命名已从 `@coffecat/*` 迁移到 `@vibeide/*`
 - [x] Electron 33 + Vite 6 + React 18
 - [x] Gateway / Worker / Agent / Runtime 四层分工
@@ -53,6 +53,9 @@
 - [x] `windows1.0` 支线开始 Windows 启动与打包适配
 - [x] 增加 Docker + Wine Windows 打包 smoke 测试入口
 - [x] `agent/tools` 长期工具补齐 Windows `.cmd` / 跨平台 `.mjs` 入口
+- [x] hardboard runtime 打包版已使用短路径 `%LOCALAPPDATA%\vibeide-hardboard-runtime\hardboard`，支持相对项目路径
+- [x] `hardboard.idf_build` / `hardboard.idf_flash` 已改为 compact 输出，完整 stdout/stderr 写入 `runtime/hardboard/logs/*.log`
+- [x] `agent/skills/espidf_hardboard.md` 已补齐 docsDir/projectsDir、排除 build、先读 `main/CMakeLists.txt` 的文件定位规则
 
 ---
 
@@ -91,7 +94,7 @@ UI -> Gateway -> Worker -> Agent -> MCP -> Runtime -> Electron Chromium
 ## 当前已知问题
 
 1. `tests/test_scaffold.py` 仍依赖旧 Python scaffold `src/coddecat`，与当前 Electron 主线不一致。
-2. Windows 原目录 `C:\vibecodingide` 还不是 Git clone 目录，后续应改为从 GitHub pull。
+2. Windows 正式目录 `C:\vibeide` 已作为 Git 工作目录使用，后续继续通过 GitHub pull 接力。
 3. `WebContentsView` 在 Linux/X11 下已增加无有效 bounds 隐藏保护，但仍需继续实机压测位置稳定性。
 4. Worker 层已接入统一搜索预处理，但平台识别仍应随新增平台继续扩展和压测。
 5. 个别 agent 规则文本仍使用旧词 `BrowserView`，语义上指的是“右侧浏览页层”。

@@ -1,6 +1,8 @@
-# vibeide
+# 奥德赛0.0
 
-`vibeide` 是一个面向硬件 vibecoding 的本地桌面 IDE 原型。它把 Electron 内置浏览器、Claude Code Agent、Runtime MCP 工具、ESP-IDF hardboard 工具链和可复用录制工作流放在同一个桌面应用里，用来完成 ESP32/ESP32-S3 工程编写、编译、烧录、文档查看和网页辅助检索。
+`奥德赛0.0` 是一个面向硬件 vibecoding 的本地桌面 IDE 原型。它把 Electron 内置浏览器、Claude Code Agent、Runtime MCP 工具、ESP-IDF hardboard 工具链和可复用录制工作流放在同一个桌面应用里，用来完成 ESP32/ESP32-S3 工程编写、编译、烧录、串口监视、文档查看和网页辅助检索。
+
+当前 GitHub 仓库和内部 npm 包名仍沿用 `vibeide`，作为工程代号和迁移兼容名；用户可见正式产品名统一为 `奥德赛0.0`。
 
 当前主线不是旧的纯 Python scaffold，而是：
 
@@ -30,14 +32,14 @@ Electron UI -> Gateway -> Worker -> Agent -> Runtime MCP -> Electron Chromium / 
 ### Windows
 
 ```powershell
-cd C:\vibecodingide
+cd C:\vibeide
 powershell -ExecutionPolicy Bypass -File scripts\start_electron_desktop.ps1
 ```
 
 或：
 
 ```cmd
-cd /d C:\vibecodingide
+cd /d C:\vibeide
 scripts\start_electron_desktop.cmd
 ```
 
@@ -131,6 +133,6 @@ pytest tests/test_project.py
 
 ## 下一步
 
-1. 先把当前源码和新文档提交到 `git@github.com:howtio/vibeide.git`。
-2. 在 Windows 上用 Git clone/pull 替代裸目录接力。
-3. 按 [重构计划](docs/REFACTOR_PLAN.md) 统一项目命名、清理旧 scaffold、整理 Runtime / Agent / Electron 边界。
+1. 继续按 [接力开发文档](docs/HANDOFF.md) 维护 Linux 本机、Windows 实机、GitHub 三方同步。
+2. 完成串口监视器的 Electron smoke，覆盖 COM/baud/encoding/实时曲线。
+3. 按 [重构计划](docs/REFACTOR_PLAN.md) 清理旧 scaffold、整理 Runtime / Agent / Electron 边界。

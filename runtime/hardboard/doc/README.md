@@ -1,6 +1,6 @@
-# Hardboard Vibecoding Agent Guide
+# 奥德赛0.0 Hardboard Vibecoding Agent Guide
 
-vibeide 当前定位为 ESP-IDF 硬件 vibecoding IDE。Agent 写代码、调用 ESP-IDF、解释错误；右侧 BrowserView 用于文档、网页、工作台文件和调试页面。
+奥德赛0.0 当前定位为 ESP-IDF 硬件 vibecoding IDE。Agent 写代码、调用 ESP-IDF、解释错误；右侧 BrowserView 用于文档、网页、工作台文件和调试页面。仓库和内部工程代号仍为 `vibeide`。
 
 ## 目录
 
@@ -31,6 +31,15 @@ vibeide 当前定位为 ESP-IDF 硬件 vibecoding IDE。Agent 写代码、调用
 8. 需要清理时：`hardboard.idf_clean`
 9. 需要擦除芯片时：`hardboard.idf_erase_flash`
 
+## 路径和文件定位规则
+
+- 任务开始先调用 `hardboard.env_status`，后续文档路径以返回的 `docsDir` 为准。
+- 不要从 Agent 当前工作目录猜 `..\runtime\hardboard\doc`；打包版 cwd 可能是 `runtime-data\agent-workspace`。
+- 工程路径优先使用 `hardboard\projects\<project-name>` 这种相对路径。
+- 查工程文件时排除 `build/**`，不要直接 `find <project> -type f`。
+- 修改源码前先读 `main/CMakeLists.txt` 的 `SRCS` 字段，不要猜源码一定叫 `main.c`。
+- `hardboard.idf_build` 和 `hardboard.idf_flash` 返回的是精简摘要；完整 stdout/stderr 在返回的 `stdoutLogPath` / `stderrLogPath`。
+
 ## 验证事实
 
 Windows `C:\vibeide` 下已完成：
@@ -38,6 +47,6 @@ Windows `C:\vibeide` 下已完成：
 - `npm --prefix runtime run smoke:hardboard` 通过，输出 `hardboard build smoke ok`。
 - `hardboard.idf_flash` 对 `COM3` 烧录 hello_world 成功。
 - `hardboard.serial_capture` 用于 SSH/Agent 下非交互抓取串口日志，替代需要 TTY 的 `idf.py monitor`。
-- `electron/dist-package/win-unpacked/vibeide.exe` 和 `electron/dist-package/vibeide-0.3.0-win-x64.exe` 已生成。
+- 打包产物正式名使用 `奥德赛0.0`。
 
 不要假装编译或烧录成功。只有 hardboard 工具返回 exitCode 0，才可以报告成功。

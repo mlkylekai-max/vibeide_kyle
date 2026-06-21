@@ -1,5 +1,7 @@
 # 2026-06-21 Claude 会话与 NES UI 重构计划
 
+> 历史计划保留作追溯。当前正式产品名为奥德赛0.0；`vibeide` 仅作为 GitHub 仓库和内部工程代号。
+
 ## 目标
 
 本轮重构解决两个核心问题：
@@ -85,11 +87,11 @@ Claude Code 的交互 TTY 协议不适合当前 `stream-json` 解析链路；直
 
 - `electron/package.json`
   - package name 改为 `@vibeide/electron`
-  - product name / title 改为 `vibeide`
+  - product name / title 改为 `奥德赛0.0`
   - 增加必要 icon 资源引用
 - `electron/electron-builder.yml`
   - `appId: com.vibeide.app`
-  - `productName: vibeide`
+  - `productName: 奥德赛0.0`
   - `win.icon: assets/icon.ico`
   - Linux/mac icon 预留
   - 不把 `apikey.txt` 作为强制 extraResource；真实 key 不应进入 installer
@@ -131,7 +133,7 @@ Claude Code 的交互 TTY 协议不适合当前 `stream-json` 解析链路；直
    - NES.css / 蓝白机风格窗口边缘
    - Agent 对话像素风
    - 右侧 Chrome 外框像素风
-   - 应用标题为 `vibeide`
+   - 应用标题为 `奥德赛0.0`
 10. 连续发送两条任务时，第二条 prompt 包含同一软件会话上下文。
 11. 右侧工作台条目点击后能打开文件 / 目录。
 12. `git status --short --ignored` 中敏感文件仍被忽略。

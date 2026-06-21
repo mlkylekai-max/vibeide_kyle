@@ -10,7 +10,7 @@
 
 目标：
 
-- README 改成 `vibeide` 当前真实主线。
+- README 改成奥德赛0.0 当前真实主线。
 - 新建统一 docs 体系。
 - 排除敏感信息、依赖、构建产物、运行态。
 - 把 GitHub 作为源码真相源。
@@ -24,27 +24,23 @@
 
 ## 阶段 1：命名统一
 
-问题：
+状态：
 
-- 根文档旧名包括 `coddecat`、`coffecat`。
-- `pyproject.toml` 仍声明 Python package `coddecat`。
-- Electron UI 显示 `coffecat v0.2.0`。
-- 生产路径里仍使用 `coffecat` appData。
+- 用户可见正式名：奥德赛0.0。
+- GitHub 仓库和内部工程代号：`vibeide`。
+- Electron package/runtime/agent npm 包名仍为 `@vibeide/*`，这是当前兼容策略。
+- 旧 `coffecat/coddecat` 只应出现在历史记录、legacy 测试或迁移说明中。
 
-建议：
+后续建议：
 
-1. 明确最终产品名是否统一为 `vibeide`。
-2. Electron package 从 `@coffecat/electron` 改成 `@vibeide/electron`。
-3. Runtime package 从 `@coffecat/runtime` 改成 `@vibeide/runtime`。
-4. Agent package 从 `@coffecat/agent` 改成 `@vibeide/agent`。
-5. UI title 改为 `vibeide`。
-6. 日志 namespace 从 `coffecat` 逐步替换。
-7. appData 迁移策略单独处理，避免破坏已有 Windows 登录态。
+1. 不要把用户可见名称改回 `vibeide`。
+2. 如需把内部包名也改成 odyssey/奥德赛，必须先设计 appData、API key、Chrome profile、日志目录和安装包升级兼容。
+3. 历史 `coffecat/coddecat` 只保留在明确标注为 legacy 的文档或测试里。
 
 验收：
 
 - `grep -R "coffecat\\|coddecat" README.md docs electron runtime agent package*.json pyproject.toml` 只剩兼容说明或迁移注释。
-- Electron 启动后 UI 显示 `vibeide`。
+- Electron 启动后 UI 显示 `奥德赛0.0`。
 
 ## 阶段 2：旧 Python scaffold 决策
 
@@ -126,4 +122,3 @@
 
 - 新 Windows 机器按 README 可以从 clone 到启动。
 - 旧 `C:\vibecodingide` 可被 `C:\vibeide` Git 目录替代。
-

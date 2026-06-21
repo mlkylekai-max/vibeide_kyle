@@ -8,7 +8,7 @@
 
 ```text
 Windows 实机
-  C:\vibecodingide
+  C:\vibeide
       ↑↓ SSH / scp
 Linux 本机
   /run/media/howtion/thinkplus/hardvibecoding/vibeide
@@ -53,16 +53,16 @@ npm --prefix electron install
 npm --prefix agent install
 ```
 
-4. 如果仍需保留旧目录 `C:\vibecodingide`，建议只作为备份，不再手工双向改。
+4. Windows 正式开发目录是 `C:\vibeide`。如果机器上仍有旧目录 `C:\vibeide`，只作为历史备份，不再手工双向改。
 
 ## 从 Windows 裸目录重新同步源码
 
-仅在 Windows 旧目录有新改动、且尚未进入 GitHub 时使用。
+仅在 Windows 工作目录有新改动、且尚未进入 GitHub 时使用。当前应优先在 `C:\vibeide` 里直接 `git pull` / `git status` / `git diff`。
 
 主源码包：
 
 ```bash
-ssh hp@192.168.137.1 "tar -a -cf C:\Users\HP\AppData\Local\Temp\vibeide-source.zip --exclude=./electron/node_modules --exclude=./electron/dist-package --exclude=./electron/dist-package.zip --exclude=./agent/node_modules --exclude=./agent/logs --exclude=./agent/screenshots --exclude=./agent/recordings --exclude=./_bundled --exclude=./apikey.txt -C C:\vibecodingide ."
+ssh hp@192.168.137.1 "tar -a -cf C:\Users\HP\AppData\Local\Temp\vibeide-source.zip --exclude=./electron/node_modules --exclude=./electron/dist-package --exclude=./electron/dist-package.zip --exclude=./agent/node_modules --exclude=./agent/logs --exclude=./agent/screenshots --exclude=./agent/recordings --exclude=./_bundled --exclude=./apikey.txt -C C:\vibeide ."
 scp hp@192.168.137.1:/C:/Users/HP/AppData/Local/Temp/vibeide-source.zip ../vibeide-source.zip
 unzip -o ../vibeide-source.zip
 ```
@@ -70,7 +70,7 @@ unzip -o ../vibeide-source.zip
 Runtime 源码包：
 
 ```bash
-ssh hp@192.168.137.1 "tar -a -cf C:\Users\HP\AppData\Local\Temp\vibeide-runtime-source.zip --exclude=./node_modules --exclude=./dist --exclude=./chrome_profile --exclude=./recordings --exclude=./workflows -C C:\vibecodingide\runtime ."
+ssh hp@192.168.137.1 "tar -a -cf C:\Users\HP\AppData\Local\Temp\vibeide-runtime-source.zip --exclude=./node_modules --exclude=./dist --exclude=./chrome_profile --exclude=./recordings --exclude=./workflows -C C:\vibeide\runtime ."
 scp hp@192.168.137.1:/C:/Users/HP/AppData/Local/Temp/vibeide-runtime-source.zip ../vibeide-runtime-source.zip
 mkdir -p runtime
 unzip -o ../vibeide-runtime-source.zip -d runtime
@@ -123,4 +123,3 @@ git check-ignore -v .local-secrets/HANDOFF_PRIVATE.md .claude/settings.local.jso
 - `.local-secrets/`
 - `.claude/`
 - `agent/.claude/`
-

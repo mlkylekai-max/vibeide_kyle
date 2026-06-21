@@ -1,5 +1,5 @@
 appId: com.vibeide.app
-productName: vibeide
+productName: 奥德赛0.0
 artifactName: "${productName}-${version}-${os}-${arch}.${ext}"
 
 directories:

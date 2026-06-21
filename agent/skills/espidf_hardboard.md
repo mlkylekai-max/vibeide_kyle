@@ -14,6 +14,8 @@
 
 ## 路径规则
 
+- 硬件任务必须先调用 `hardboard.env_status`。后续读取文档、示例、工程时，以返回的 `docsDir`、`examplesDir`、`projectsDir` 为准。
+- 不要假设当前工作目录在仓库根目录。Agent 默认 cwd 可能是 `runtime-data/agent-workspace`，因此 `..\runtime\hardboard\doc` 这类相对路径经常会错。
 - 调用 hardboard 工具时优先使用相对工程路径，例如 `hardboard\projects\wifi_connect_fmai`。
 - 不要手写打包后的长绝对路径，例如 `C:\vibeide\electron\dist-package\win-unpacked\resources\runtime\hardboard\...`。
 - Windows 打包版 runtime 会自动把 hardboard 映射到短路径 `%LOCALAPPDATA%\vibeide-hardboard-runtime\hardboard`。
@@ -24,8 +26,9 @@
 
 硬件任务开始时先读：
 
-1. `runtime/hardboard/doc/README.md`
-2. `runtime/hardboard/doc/device-profile-esp32s3.md`
+1. 调用 `hardboard.env_status`。
+2. 读取返回的 `${docsDir}\README.md`。
+3. 读取返回的 `${docsDir}\device-profile-esp32s3.md`。
 
 如果任务涉及官方流程，可在右侧 BrowserView 打开 Espressif 文档，但不要用网页步骤替代 hardboard 工具。
 
@@ -45,6 +48,10 @@
 
 - 不要直接修改 `runtime/hardboard/example/**`；先复制到 `runtime/hardboard/projects/<project-name>`。
 - 不要把工程放到带空格路径。
+- 查文件时不要直接 `find <project>` 扫整个工程，因为 `build/**` 会产生几十万字符输出。应使用：
+  - `find <project> -path '*/build' -prune -o -type f -print`
+  - 或只查 `CMakeLists.txt`、`main/CMakeLists.txt`、`main/*`。
+- 不要猜源码叫 `main.c`。必须先读 `main/CMakeLists.txt` 的 `SRCS` 字段，再打开真实源码文件，例如 `wifi_connect_main.c`。
 - 修改 ESP-IDF 工程时重点检查：
   - 顶层 `CMakeLists.txt`
   - `main/CMakeLists.txt`
@@ -73,5 +80,5 @@
 - Windows `C:\vibeide` 下 ESP-IDF 5.4.3 可用。
 - `runtime/hardboard/projects/hello_world_esp32s3` 已完成 set-target/build。
 - ESP32-S3 板子在 `COM3` 烧录成功。
-- 打包产物已生成 `win-unpacked` 和 `vibeide-0.3.0-win-x64.exe`。
+- 打包产物正式名使用 `奥德赛0.0`，目录仍是 `win-unpacked`。
 - 打包版 runtime 已验证可用相对路径编译和烧录：`hardboard\projects\wifi_connect_fmai`。

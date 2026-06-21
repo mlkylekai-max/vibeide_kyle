@@ -1,21 +1,23 @@
-# vibeide 接力开发文档
+# 奥德赛0.0 接力开发文档
 
 > 本文记录当前接手状态、架构规则、开发流程和同步方式。敏感账号密码不写在本文，见本机私有文件 `.local-secrets/HANDOFF_PRIVATE.md`，该目录已被 `.gitignore` 排除。
 
 ## 当前位置
 
 - GitHub 仓库：`git@github.com:howtio/vibeide.git`
-- Windows 实机目录：`C:\vibecodingide`
+- Windows 实机目录：`C:\vibeide`
 - 本机工作目录：`/run/media/howtion/thinkplus/hardvibecoding/vibeide`
 - Windows SSH：`hp@192.168.137.1`
 - Windows 机器名：`LAPTOP-JQQD9L56`
 
 ## 当前状态
 
-- GitHub 仓库原始状态只有 `README.md`，本机已从 Windows 同步出源码镜像，并已重写新的 GitHub README。
-- Windows 原目录不是 Git 仓库。
-- 项目总大小约 `4.25 GB`，但源码镜像约 `24 MB`。
-- 新文档体系已建立：
+- 正式项目名：奥德赛0.0。
+- 内部工程代号 / GitHub 仓库：`vibeide`。
+- Windows 正式目录：`C:\vibeide`，已经是 Git 仓库，后续以 GitHub `main` 为源码真相源。
+- Linux 本机目录：`/run/media/howtion/thinkplus/hardvibecoding/vibeide`，用于主要改代码、提交和推送。
+- Windows 端用于真实 Electron、ESP-IDF、ESP32-S3、串口和打包验证。
+- 新文档体系：
   - `docs/INDEX.md`
   - `docs/ARCHITECTURE.md`
   - `docs/DEVELOPMENT.md`
@@ -38,6 +40,123 @@
   - `runtime/workflows`
   - `_bundled`
   - `apikey.txt`
+
+## 接力操作手册
+
+### 1. 开始前
+
+```bash
+cd /run/media/howtion/thinkplus/hardvibecoding/vibeide
+git pull --ff-only origin main
+git status --short
+```
+
+必须先读：
+
+```bash
+sed -n '1,220p' README.md
+sed -n '1,260p' docs/HANDOFF.md
+sed -n '1,260p' docs/HARDBOARD_CONSTRUCTION.md
+sed -n '1,180p' agent/skills/espidf_hardboard.md
+```
+
+### 2. Windows SSH 链路
+
+Windows 主机：
+
+```text
+hp@192.168.137.1
+C:\vibeide
+```
+
+从 Linux 执行 Windows 命令的模式：
+
+```bash
+SSHPASS='<本机私有密码>' sshpass -e ssh -o StrictHostKeyChecking=no hp@192.168.137.1 "cmd /d /s /c \"cd /d C:\\vibeide && git status --short\""
+```
+
+密码和 API key 只在 `.local-secrets/HANDOFF_PRIVATE.md` 或用户本机环境中保存，不写入公开文档、提交信息、日志摘要或 issue。
+
+### 3. 改代码原则
+
+- 主要在 Linux 本机改源码。
+- 用 `apply_patch` 精确改文件，不用 `git checkout --` 回滚用户改动。
+- 不提交 `node_modules`、`dist`、`dist-package`、runtime logs、Chrome profile、密钥。
+- hardboard 工程文件不要扫 `build/**`，查源码先读 `main/CMakeLists.txt` 的 `SRCS`。
+- hardboard 工具调用优先使用相对路径：`hardboard\projects\<project>`。
+
+### 4. 本机验证
+
+```bash
+npm --prefix runtime run build
+npm --prefix electron run typecheck
+npm --prefix electron run build:main
+npm --prefix electron run build:renderer
+```
+
+如果改了 Agent skill/context：
+
+```bash
+npm --prefix electron run verify:session
+npm --prefix electron run verify:hardboard
+```
+
+### 5. GitHub 同步
+
+```bash
+git status --short
+git add <明确文件>
+git commit -m "<type>: <summary>"
+git push origin main
+```
+
+Windows 拉取：
+
+```bash
+SSHPASS='<本机私有密码>' sshpass -e ssh -o StrictHostKeyChecking=no hp@192.168.137.1 "cmd /d /s /c \"cd /d C:\\vibeide && git pull --ff-only origin main\""
+```
+
+### 6. Windows 编译和打包
+
+快速验证源码：
+
+```bash
+SSHPASS='<本机私有密码>' sshpass -e ssh -o StrictHostKeyChecking=no hp@192.168.137.1 "cmd /d /s /c \"cd /d C:\\vibeide && npm --prefix runtime run build && npm --prefix electron run typecheck && npm --prefix electron run build:main && npm --prefix electron run build:renderer\""
+```
+
+完整 Windows 打包：
+
+```bash
+SSHPASS='<本机私有密码>' sshpass -e ssh -o StrictHostKeyChecking=no hp@192.168.137.1 "cmd /d /s /c \"cd /d C:\\vibeide && npm --prefix electron run dist:win\""
+```
+
+当前正式产品名是奥德赛0.0；打包产物文件名会使用该产品名。
+
+### 7. Hardboard 验证
+
+```cmd
+cd /d C:\vibeide\electron\dist-package\win-unpacked\resources\runtime
+node dist\index.js hardboard:env
+node dist\index.js hardboard:build hardboard\projects\wifi_connect_fmai
+node dist\index.js hardboard:devices
+node dist\index.js hardboard:flash hardboard\projects\wifi_connect_fmai COM3
+node dist\index.js hardboard:serial COM3 10 115200
+```
+
+期望：
+
+- `hardboard:env` 的 `hardboardRoot` 指向 `%LOCALAPPDATA%\vibeide-hardboard-runtime\hardboard`。
+- build/flash 返回 compact JSON，包含 `exitCode`、`ok`、`stdoutTail`、`stderrTail`、`stdoutLogPath`、`stderrLogPath`。
+- 完整 Ninja / esptool 输出在 `runtime/hardboard/logs/*.log`。
+
+### 8. 日志问题处理
+
+如果用户提供 `log.txt`：
+
+- 先完整阅读日志，不只看首尾。
+- 从日志中提炼工具问题、skill 问题、路径问题和 UI/文档漂移问题。
+- 对应修复必须落到代码或文档规则里，不能只解释。
+- 如果 MCP 输出过大，应优先修工具返回格式，让 Agent 不需要读取 Claude 自己保存的超长 tool-result 文件。
 
 ## 架构概览
 
@@ -162,7 +281,7 @@ npm run build:renderer
 Windows 上项目目录：
 
 ```powershell
-cd C:\vibecodingide
+cd C:\vibeide
 ```
 
 推荐启动：
@@ -184,7 +303,7 @@ scripts\start_electron_desktop.cmd
 1. 本机修改源码。
 2. 本机验证。
 3. 提交并 push 到 `git@github.com:howtio/vibeide.git`。
-4. Windows 端后续改为 clone/pull 该仓库，或者从本机同步变更文件回 `C:\vibecodingide`。
+4. Windows 端后续改为 clone/pull 该仓库，或者从本机同步变更文件回 `C:\vibeide`。
 
 不要把 Windows 当前整目录直接提交，因为里面有依赖、构建产物、运行态和密钥。
 
@@ -195,7 +314,7 @@ scripts\start_electron_desktop.cmd
 如果 Windows 原目录有新改动，可重新打源码包。注意继续排除依赖、产物、运行态和密钥：
 
 ```bash
-ssh hp@192.168.137.1 "tar -a -cf C:\Users\HP\AppData\Local\Temp\vibeide-source.zip --exclude=./electron/node_modules --exclude=./electron/dist-package --exclude=./electron/dist-package.zip --exclude=./agent/node_modules --exclude=./agent/logs --exclude=./agent/screenshots --exclude=./agent/recordings --exclude=./_bundled --exclude=./apikey.txt -C C:\vibecodingide ."
+ssh hp@192.168.137.1 "tar -a -cf C:\Users\HP\AppData\Local\Temp\vibeide-source.zip --exclude=./electron/node_modules --exclude=./electron/dist-package --exclude=./electron/dist-package.zip --exclude=./agent/node_modules --exclude=./agent/logs --exclude=./agent/screenshots --exclude=./agent/recordings --exclude=./_bundled --exclude=./apikey.txt -C C:\vibeide ."
 scp hp@192.168.137.1:/C:/Users/HP/AppData/Local/Temp/vibeide-source.zip ../vibeide-source.zip
 unzip -o ../vibeide-source.zip
 ```
@@ -203,7 +322,7 @@ unzip -o ../vibeide-source.zip
 `runtime/` 要单独同步源码，避免把运行态一起带进来：
 
 ```bash
-ssh hp@192.168.137.1 "tar -a -cf C:\Users\HP\AppData\Local\Temp\vibeide-runtime-source.zip --exclude=./node_modules --exclude=./dist --exclude=./chrome_profile --exclude=./recordings --exclude=./workflows -C C:\vibecodingide\runtime ."
+ssh hp@192.168.137.1 "tar -a -cf C:\Users\HP\AppData\Local\Temp\vibeide-runtime-source.zip --exclude=./node_modules --exclude=./dist --exclude=./chrome_profile --exclude=./recordings --exclude=./workflows -C C:\vibeide\runtime ."
 scp hp@192.168.137.1:/C:/Users/HP/AppData/Local/Temp/vibeide-runtime-source.zip ../vibeide-runtime-source.zip
 mkdir -p runtime
 unzip -o ../vibeide-runtime-source.zip -d runtime
@@ -222,7 +341,7 @@ unzip -o ../vibeide-runtime-source.zip -d runtime
 
 - 这个项目目前更像 Electron + Runtime + Agent 的桌面采集原型，而不是 README 里旧的纯 Python `coddecat` scaffold。
 - `pyproject.toml` 和 `tests/test_scaffold.py` 仍保留旧 Python scaffold 叙事，可能与当前主链路不一致。
-- `README.md`、`CLAUDE.md` 已先统一成 `vibeide` 当前主线。
+- `README.md`、`CLAUDE.md` 已先统一成 `奥德赛0.0` 当前主线。
 - 代码、package、UI、部分注释中仍有旧名 `coffecat/coddecat`，后续按 `docs/REFACTOR_PLAN.md` 分阶段处理。
 - `electron/dist/` 已被同步出来，但属于构建产物，后续应从 Git 中排除。
 - 中文文件名文档在当前 Linux 外置盘解包时出现编码/权限问题，必要时应从 Windows 远程读取或重命名为 ASCII 文件名后再入库。

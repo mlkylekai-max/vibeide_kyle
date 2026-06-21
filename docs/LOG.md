@@ -2,6 +2,33 @@
 
 > 当前日志只保留对现代码仍然成立的记录。
 
+## 2026-06-22 — log.txt 复盘、Hardboard 工具输出收敛与奥德赛0.0 命名
+
+- 正式项目名确定为：奥德赛0.0。
+- GitHub 仓库和内部工程代号继续使用 `vibeide`，避免一次性迁移 appData、npm 包名、API key 路径和历史运行态。
+- 修复 hardboard 工具输出过大问题：
+  - `runIdfCommand` 会把 stdout/stderr 写入 `runtime/hardboard/logs/*.log`。
+  - MCP `hardboard.idf_build`、`hardboard.idf_flash`、`hardboard.idf_set_target`、`hardboard.idf_clean`、`hardboard.idf_erase_flash` 返回 compact JSON。
+  - Runtime CLI `hardboard:build`、`hardboard:flash` 也返回 compact JSON。
+- 修复 Agent skill 文件定位规则：
+  - 硬件任务必须先 `hardboard.env_status`，读取返回的 `docsDir/projectsDir`。
+  - 禁止从 `runtime-data/agent-workspace` 猜 `..\runtime\hardboard\doc`。
+  - 查工程文件必须排除 `build/**`。
+  - 修改源码前先读 `main/CMakeLists.txt` 的 `SRCS`，不要猜源码叫 `main.c`。
+- 用户可见命名已更新：
+  - Electron 窗口标题：奥德赛0.0
+  - 托盘 tooltip：奥德赛0.0
+  - renderer `<title>`：奥德赛0.0
+  - electron-builder `productName`：奥德赛0.0
+- 文档更新：
+  - `README.md`
+  - `docs/HANDOFF.md`
+  - `docs/GITHUB_SYNC.md`
+  - `docs/HARDBOARD_CONSTRUCTION.md`
+  - `docs/DEV_PROGRESS.md`
+  - `runtime/hardboard/doc/README.md`
+  - `agent/skills/espidf_hardboard.md`
+
 ## 2026-06-21 — Claude 软件会话与 NES UI 重构
 
 - 新增：
@@ -79,7 +106,7 @@
 - 验证：
   - GitHub SSH 已验证可访问
   - Windows SSH 已验证可访问
-  - Windows `C:\vibecodingide` 源码已同步到本机，排除依赖、构建产物、运行态和密钥
+  - Windows `C:\vibeide` 源码已同步到本机，排除依赖、构建产物、运行态和密钥
 
 ## 2026-06-10 — windows1.0 支线 Windows 适配启动
 

@@ -13,7 +13,7 @@ export function setupTray(): Tray {
     { label: '退出', role: 'quit' },
   ]);
 
-  tray.setToolTip('vibeide');
+  tray.setToolTip('奥德赛0.0');
   tray.setContextMenu(menu);
 
   return tray;

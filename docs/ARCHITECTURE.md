@@ -2,7 +2,7 @@
 
 ## 一句话
 
-`vibeide` 是一个 Electron 桌面自动化 IDE：用户在左侧对话，右侧是工作台和内置浏览器；任务由 Worker 编排，Agent 通过 Runtime MCP tools 控制同一个 Electron Chromium。
+`奥德赛0.0` 是一个 Electron 桌面自动化 IDE：用户在左侧对话，右侧是工作台和内置浏览器；任务由 Worker 编排，Agent 通过 Runtime MCP tools 控制同一个 Electron Chromium。
 
 ## 分层
 
@@ -144,9 +144,8 @@ Electron Chromium / WebContentsView
 
 ## 当前架构风险
 
-1. README、Python package 和部分历史测试仍带旧 `coddecat/coffecat` 叙事。
+1. 用户可见正式名已是奥德赛0.0，但内部仓库、npm 包和部分运行态目录仍沿用 `vibeide` 作为工程代号；后续如要彻底迁移需单独设计兼容策略。
 2. `tests/test_scaffold.py` 依赖旧 `src/coddecat`，与当前主线不一致。
-3. `electron/src/main/paths.ts` 的注释和生产路径仍含 `coffecat` 命名。
+3. 历史文档仍保留部分 `coffecat/coddecat` 迁移记录；这些只作为历史，不应作为当前实现依据。
 4. Electron 侧和 Runtime 侧都有录制/回放实现，需要明确长期边界。
 5. `runtime/workflows/` 默认忽略，若未来要内置示例 workflow，需要单独设计 `examples/workflows/`。
-

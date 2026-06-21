@@ -23,7 +23,7 @@
 4. 打开网页 → 直接用 `browser.navigate({ url: "..." })`
 5. 每个操作后调 `browser.screenshot` 确认页面状态
 6. 如果操作失败，不要慌张，检查 `browser.getState` 看当前 URL
-7. HTML/CSS/JS 文件可以写到 `agent/` 目录下，但必须用 `browser.navigate` 打开：`file:///home/howtion/coffecat/agent/xxx.html`
+7. HTML/CSS/JS 文件默认写到 Agent 可写工作区；如果明确需要放入仓库 `agent/` 目录，必须用当前机器的实际绝对路径生成 `file:///.../agent/xxx.html` 后再 `browser.navigate` 打开，不要套用历史项目路径。
 8. 无论是网页、B 站还是股票搜索，目标都必须在 Electron BrowserView 内完成，绝不能回退到系统 Chrome
 9. 如果用户指定平台，必须只在该平台内完成，禁止擅自切去别的网站找替代结果
 10. 用户说“B站/哔哩哔哩”时，只允许 `bilibili.com` 域名；如果跳到 YouTube/Google/Bing，必须立刻返回 B 站

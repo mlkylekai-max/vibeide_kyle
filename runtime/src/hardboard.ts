@@ -21,6 +21,8 @@ export interface HardboardCommandResult {
   stdout: string;
   stderr: string;
   logPath?: string;
+  stdoutLogPath?: string;
+  stderrLogPath?: string;
 }
 
 export interface HardboardSnapshotResult {
@@ -265,6 +267,7 @@ export async function runIdfCommand(
   fs.mkdirSync(RUNTIME_DIRS.hardboardLogs, { recursive: true });
   const commandArgs = [idfPy, ...args];
   const env = buildIdfEnv(idfPath, version);
+  const logBase = createIdfLogBase(args, resolvedProjectDir);
   try {
     const { stdout, stderr } = await execFileAsync(python, commandArgs, {
       cwd: resolvedProjectDir,
@@ -273,12 +276,14 @@ export async function runIdfCommand(
       maxBuffer: 1024 * 1024 * 20,
       windowsHide: true,
     });
+    const logs = writeCommandLogs(logBase, stdout, stderr);
     return {
       command: `${python} ${commandArgs.join(' ')}`,
       cwd: resolvedProjectDir,
       exitCode: 0,
       stdout,
       stderr,
+      ...logs,
     };
   } catch (error) {
     const err = error as NodeJS.ErrnoException & { stdout?: string; stderr?: string; code?: number };
@@ -286,12 +291,16 @@ export async function runIdfCommand(
       fs.rmSync(path.join(resolvedProjectDir, 'build'), { recursive: true, force: true });
       return runIdfCommand(resolvedProjectDir, args, version, false);
     }
+    const stdout = err.stdout ?? '';
+    const stderr = err.stderr ?? err.message;
+    const logs = writeCommandLogs(logBase, stdout, stderr);
     return {
       command: `${python} ${commandArgs.join(' ')}`,
       cwd: resolvedProjectDir,
       exitCode: typeof err.code === 'number' ? err.code : 1,
-      stdout: err.stdout ?? '',
-      stderr: err.stderr ?? err.message,
+      stdout,
+      stderr,
+      ...logs,
     };
   }
 }
@@ -375,6 +384,27 @@ function shouldRetryAfterBuildPathChange(stdout: string, stderr: string, args: s
   return output.includes('Run \'idf.py fullclean\'')
     || output.includes('Run "idf.py fullclean"')
     || output.includes('was configured with');
+}
+
+function createIdfLogBase(args: string[], projectDir: string): string {
+  const projectName = path.basename(projectDir) || 'project';
+  const action = args.find((arg) => !arg.startsWith('-') && !arg.match(/^COM\d+$/i)) || 'idf';
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const safeAction = action.replace(/[^a-zA-Z0-9._-]+/g, '-');
+  const safeProject = projectName.replace(/[^a-zA-Z0-9._-]+/g, '-');
+  return path.join(RUNTIME_DIRS.hardboardLogs, `${stamp}-${safeProject}-${safeAction}`);
+}
+
+function writeCommandLogs(logBase: string, stdout: string, stderr: string): Pick<HardboardCommandResult, 'logPath' | 'stdoutLogPath' | 'stderrLogPath'> {
+  const stdoutLogPath = `${logBase}.stdout.log`;
+  const stderrLogPath = `${logBase}.stderr.log`;
+  fs.writeFileSync(stdoutLogPath, stdout, 'utf-8');
+  fs.writeFileSync(stderrLogPath, stderr, 'utf-8');
+  return {
+    logPath: stdoutLogPath,
+    stdoutLogPath,
+    stderrLogPath,
+  };
 }
 
 function resolveIdfPy(idfPath: string): string {
