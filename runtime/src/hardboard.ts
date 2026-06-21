@@ -214,6 +214,7 @@ function buildIdfEnv(idfPath: string, version: string): NodeJS.ProcessEnv {
   const idfPythonEnvPath = resolveIdfPythonEnvPath(version);
   const oldPath = process.env.PATH || '';
   const pythonBin = idfPythonEnvPath ? path.join(idfPythonEnvPath, process.platform === 'win32' ? 'Scripts' : 'bin') : '';
+  const installedToolPaths = discoverInstalledIdfToolPaths(idfToolsPath);
   return {
     ...process.env,
     IDF_PATH: idfPath,
@@ -222,8 +223,54 @@ function buildIdfEnv(idfPath: string, version: string): NodeJS.ProcessEnv {
     IDF_PYTHON_CHECK_CONSTRAINTS: 'no',
     ESP_IDF_VERSION: version,
     VIBEIDE_HARDBOARD_ROOT: RUNTIME_DIRS.hardboard,
-    PATH: [pythonBin, toolsDir, oldPath].filter(Boolean).join(path.delimiter),
+    PATH: [pythonBin, toolsDir, ...installedToolPaths, oldPath].filter(Boolean).join(path.delimiter),
   };
+}
+
+function discoverInstalledIdfToolPaths(idfToolsPath: string): string[] {
+  const toolsRoot = path.join(idfToolsPath, 'tools');
+  if (!fs.existsSync(toolsRoot)) return [];
+
+  const executableExtensions = process.platform === 'win32' ? ['.exe', '.cmd', '.bat'] : [''];
+  const paths = new Set<string>();
+  const queue: Array<{ dir: string; depth: number }> = [{ dir: toolsRoot, depth: 0 }];
+  const maxDepth = 5;
+
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (!current) continue;
+
+    let entries: fs.Dirent[];
+    try {
+      entries = fs.readdirSync(current.dir, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+
+    const hasExecutable = entries.some((entry) => {
+      if (!entry.isFile()) return false;
+      if (process.platform !== 'win32') {
+        try {
+          return Boolean(fs.statSync(path.join(current.dir, entry.name)).mode & 0o111);
+        } catch {
+          return false;
+        }
+      }
+      const lower = entry.name.toLowerCase();
+      return executableExtensions.some((extension) => lower.endsWith(extension));
+    });
+
+    if (hasExecutable) paths.add(current.dir);
+    if (current.depth >= maxDepth) continue;
+
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        queue.push({ dir: path.join(current.dir, entry.name), depth: current.depth + 1 });
+      }
+    }
+  }
+
+  return [...paths];
 }
 
 function resolveIdfToolsPath(): string {
