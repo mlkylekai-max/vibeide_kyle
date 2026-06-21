@@ -32,12 +32,14 @@ static void event_handler(void *arg, esp_event_base_t event_base, int32_t event_
     }
 
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
+        const wifi_event_sta_disconnected_t *event = (const wifi_event_sta_disconnected_t *)event_data;
         wifi_connected = false;
         if (retry_count < MAXIMUM_RETRY) {
             retry_count += 1;
-            ESP_LOGW(TAG, "Wi-Fi disconnected, retry %d/%d", retry_count, MAXIMUM_RETRY);
+            ESP_LOGW(TAG, "Wi-Fi disconnected, reason=%d, retry %d/%d", event->reason, retry_count, MAXIMUM_RETRY);
             esp_wifi_connect();
         } else {
+            ESP_LOGE(TAG, "Wi-Fi disconnected, reason=%d, no retries left", event->reason);
             xEventGroupSetBits(wifi_event_group, WIFI_FAIL_BIT);
         }
         return;
