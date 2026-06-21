@@ -53,6 +53,47 @@ hardboard.idf_clean
 hardboard.idf_erase_flash
 ```
 
+## 路径规则
+
+ESP-IDF 工程可以使用相对路径，推荐 Agent 和工具调用统一写：
+
+```text
+hardboard\projects\<project-name>
+```
+
+不要让 Agent 拼 `C:\vibeide\electron\dist-package\win-unpacked\resources\runtime\hardboard\...` 这种打包后的长绝对路径。Windows 打包版 runtime 会在内部把 hardboard 根目录映射到短路径：
+
+```text
+%LOCALAPPDATA%\vibeide-hardboard-runtime\hardboard
+```
+
+用途：
+
+- 避免随包 ESP-IDF/GCC 工具链在很深的 `resources\runtime\hardboard\esptools\...` 路径下出现 C++ 标准库头文件解析异常。
+- 让 `hardboard.env_status` 返回的 `idfPath`、`python`、`idfToolsPath`、`projectsDir` 都是短路径。
+- 允许旧的打包绝对路径输入被 runtime 自动重写到短路径别名下。
+- 如果旧 build 缓存记录了旧 Python 或旧路径，runtime 会删除该项目 `build` 目录并自动重试一次。
+
+已定位过的典型错误：
+
+```text
+fatal error: bits/stl_iterator_base_types.h: No such file or directory
+```
+
+这个错误不是 ESP-IDF 源码缺文件。实测头文件存在，问题出在打包后路径环境。修复后用打包版 runtime 执行：
+
+```cmd
+cd /d C:\vibeide\electron\dist-package\win-unpacked\resources\runtime
+node dist\index.js hardboard:env
+node dist\index.js hardboard:build hardboard\projects\wifi_connect_fmai
+```
+
+`hardboard:env` 应显示：
+
+```text
+hardboardRoot = C:\Users\HP\AppData\Local\vibeide-hardboard-runtime\hardboard
+```
+
 ## 已验证状态
 
 - Windows 仓库：`C:\vibeide`。
@@ -75,6 +116,13 @@ hardboard.idf_erase_flash
   - `electron/dist-package/win-unpacked/vibeide.exe`
   - `electron/dist-package/vibeide-0.3.0-win-x64.exe`
   - `electron/dist-package/vibeide-0.3.0-win-x64.exe.blockmap`
+- 打包版 runtime 相对路径编译已通过：
+  - 命令：`node dist\index.js hardboard:build hardboard\projects\wifi_connect_fmai`
+  - `cwd`：`%LOCALAPPDATA%\vibeide-hardboard-runtime\hardboard\projects\wifi_connect_fmai`
+  - `exitCode`：`0`
+- 打包版 runtime 烧录已通过：
+  - 命令：`node dist\index.js hardboard:flash hardboard\projects\wifi_connect_fmai COM3`
+  - `COM3` 识别为 ESP32-S3，写入和 hash verified 均成功。
 
 ## 随包环境策略
 
@@ -100,6 +148,10 @@ Windows 打包配置包含 `runtime/hardboard`，但排除 ESP-IDF 自带 `examp
 
 ## 后续增强
 
-- 增加串口日志面板，把 `hardboard.serial_capture` 结果展示到右侧工作台。
+- 串口监视器继续增强：
+  - 前端入口在右侧 `监视器` 标签。
+  - 已有 COM、波特率、字符编码选择。
+  - 已有实时文本和数值曲线；曲线会从每行提取最后一个数字，适配 `sin:0.7071`、`value=0.7071` 等格式。
+  - 后续要补 Electron smoke，直接调用主进程串口监视器并等待真实 `serial-data` IPC。
 - 为 ESP32-C3/ESP32-C6 增加示例、target、真实设备记录。
 - 增加固件归档工具，把 `.bin/.elf/.map/flasher_args.json` 复制到 `runtime/hardboard/firmware`。

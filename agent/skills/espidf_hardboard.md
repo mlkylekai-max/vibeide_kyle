@@ -12,6 +12,14 @@
 - Agent 可读文档：`runtime/hardboard/doc`。
 - 本地快照目录：`runtime/hardboard/git-snapshots`。
 
+## 路径规则
+
+- 调用 hardboard 工具时优先使用相对工程路径，例如 `hardboard\projects\wifi_connect_fmai`。
+- 不要手写打包后的长绝对路径，例如 `C:\vibeide\electron\dist-package\win-unpacked\resources\runtime\hardboard\...`。
+- Windows 打包版 runtime 会自动把 hardboard 映射到短路径 `%LOCALAPPDATA%\vibeide-hardboard-runtime\hardboard`。
+- 如果用户贴出 `bits/stl_iterator_base_types.h: No such file or directory`，先检查 `hardboard.env_status` 是否已经显示短路径；这个错误通常不是头文件丢失，而是打包长路径/旧 build 缓存问题。
+- 旧 build 缓存可能记录旧 Python 或旧路径；runtime 会自动删 `build` 并重试一次，但排查时仍要留意 `Run 'idf.py fullclean'` 相关提示。
+
 ## 先读资料
 
 硬件任务开始时先读：
@@ -53,9 +61,17 @@
 - “运行正常”必须来自 `hardboard.serial_capture` 的串口日志，或用户能看到的等价硬件输出。
 - 不能因为生成了代码或看起来合理就报告硬件验证成功。
 
+## 串口监视器测试
+
+- IDE 前端的串口监视器在右侧 `监视器` 标签，不等同于 `hardboard.serial_capture` 一次性抓日志。
+- 测试 IDE 监视器时，先确认板子正在用 `COM3`/`115200` 持续输出文本。
+- 曲线测试推荐固件每行输出一个可解析数字，例如 `sin:0.7071`；前端曲线会提取每行最后一个数字。
+- 如果命令行 `hardboard.serial_capture COM3 5 115200` 能收到数据，但 IDE 监视器收不到，要继续查 Electron 主进程 `hardboard:serialStart` 和渲染进程 `hardboard:serial-data` IPC。
+
 ## 已验证基线
 
 - Windows `C:\vibeide` 下 ESP-IDF 5.4.3 可用。
 - `runtime/hardboard/projects/hello_world_esp32s3` 已完成 set-target/build。
 - ESP32-S3 板子在 `COM3` 烧录成功。
 - 打包产物已生成 `win-unpacked` 和 `vibeide-0.3.0-win-x64.exe`。
+- 打包版 runtime 已验证可用相对路径编译和烧录：`hardboard\projects\wifi_connect_fmai`。
