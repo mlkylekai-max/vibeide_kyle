@@ -130,6 +130,13 @@ export default function BrowserPanel({
     onActivateTab(nextViewId);
   };
 
+  const handleCloseTab = (tabId: string) => {
+    if (selectedViewId === tabId) {
+      setSelectedViewId(WORKBENCH_VIEW_ID);
+    }
+    onCloseTab(tabId);
+  };
+
   const browserTitle = selectedTab?.title || activeTab?.title || '浏览页';
   const replayOptions = recordings.map((recording) => ({
     value: recording.file,
@@ -158,12 +165,14 @@ export default function BrowserPanel({
                 <button
                   type="button"
                   className="browser-tab-close nes-btn is-error"
+                  title="关闭页面"
+                  aria-label={`关闭页面 ${tab.title || tab.url || tab.id}`}
                   onClick={(e) => {
                     e.stopPropagation();
-                    onCloseTab(tab.id);
+                    handleCloseTab(tab.id);
                   }}
                 >
-                  x
+                  ×
                 </button>
               ) : null}
             </div>
@@ -171,14 +180,25 @@ export default function BrowserPanel({
         </div>
         <div className="browser-switcher">
           <span>页面</span>
-          <select className="nes-select" value={selectedViewId} onChange={(e) => handleSelectView(e.target.value)}>
-            <option value={WORKBENCH_VIEW_ID}>工作台 / 对话页</option>
-            {visibleTabs.map((tab) => (
-              <option key={tab.id} value={tab.id}>
-                {tab.title || tab.url || tab.id}
-              </option>
-            ))}
-          </select>
+          <div className="browser-switcher-controls">
+            <select className="nes-select" value={selectedViewId} onChange={(e) => handleSelectView(e.target.value)}>
+              <option value={WORKBENCH_VIEW_ID}>工作台 / 对话页</option>
+              {visibleTabs.map((tab) => (
+                <option key={tab.id} value={tab.id}>
+                  {tab.title || tab.url || tab.id}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              className="browser-close-current nes-btn is-error"
+              onClick={() => selectedTab && handleCloseTab(selectedTab.id)}
+              disabled={!selectedTab}
+              title="关闭当前页面"
+            >
+              关闭页
+            </button>
+          </div>
         </div>
       </div>
 

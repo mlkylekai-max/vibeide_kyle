@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import ChatPanel from './components/ChatPanel';
 import BrowserPanel from './components/BrowserPanel';
 import TaskProgress from './components/TaskProgress';
-import ResultPanel from './components/ResultPanel';
 import type { BrowserTab, ChatMessage, RecordingSummary, TaskStep, WorkbenchOverview } from './types';
 
 export default function App() {
@@ -223,7 +222,6 @@ export default function App() {
         <div className="left-panel">
           <ChatPanel messages={messages} onSend={handleSend} />
           <TaskProgress steps={steps} />
-          <ResultPanel />
         </div>
         <div className="right-panel">
           <BrowserPanel
