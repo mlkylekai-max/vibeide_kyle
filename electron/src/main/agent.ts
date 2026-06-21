@@ -23,23 +23,14 @@ const DEFAULT_DEEPSEEK_MODEL = 'deepseek-v4-pro';
 
 let agentProcess: ChildProcess | null = null;
 let agentSeq = 0;
+let agentMcpConfigPath: string | null = null;
 
-export interface SpawnAgentOptions {
-  continueSession?: boolean;
-}
-
-export function spawnAgent(prompt: string, options: SpawnAgentOptions = {}): ChildProcess {
-  const seq = ++agentSeq;
-
-  if (agentProcess) {
-    logger.warn('agent:kill', { reason: 'replaced by new agent', oldSeq: agentSeq - 1, newSeq: seq });
-    const old = agentProcess;
-    old.stdout?.removeAllListeners();
-    old.stderr?.removeAllListeners();
-    old.removeAllListeners();
-    old.kill('SIGKILL');
-    agentProcess = null;
+export function ensureAgentProcess(): ChildProcess {
+  if (agentProcess && !agentProcess.killed && agentProcess.exitCode == null) {
+    return agentProcess;
   }
+
+  const seq = ++agentSeq;
 
   // 动态生成 MCP 配置（不依赖静态文件）
   const mcpConfig = buildMcpConfig();
@@ -55,31 +46,32 @@ export function spawnAgent(prompt: string, options: SpawnAgentOptions = {}): Chi
   }
 
   const args = [
+    '-p',
     '--mcp-config', mcpConfigPath,
     '--dangerously-skip-permissions',
+    '--input-format', 'stream-json',
     '--output-format', 'stream-json',
     '--verbose',
-    ...(options.continueSession ? ['--continue'] : []),
-    '-p', prompt,
+    '--replay-user-messages',
   ];
 
   logger.info('agent:spawn', {
     bin: CLAUDE_BIN,
     args: [
+      '-p',
       '--mcp-config',
       '<dynamic>',
       '--dangerously-skip-permissions',
+      '--input-format',
+      'stream-json',
       '--output-format',
       'stream-json',
       '--verbose',
-      ...(options.continueSession ? ['--continue'] : []),
-      '-p',
-      `(${prompt.length} chars)`,
+      '--replay-user-messages',
     ],
     cwd: AGENT_DIR,
     mcpConfigPath,
     seq,
-    continueSession: !!options.continueSession,
   });
 
   const env = buildAgentEnv();
@@ -87,8 +79,9 @@ export function spawnAgent(prompt: string, options: SpawnAgentOptions = {}): Chi
   agentProcess = spawn(CLAUDE_BIN, args, {
     cwd: AGENT_DIR,
     env,
-    stdio: ['ignore', 'pipe', 'pipe'],
+    stdio: ['pipe', 'pipe', 'pipe'],
   });
+  agentMcpConfigPath = mcpConfigPath;
 
   // 进程退出后清理临时 MCP 配置文件
   const cleanup = () => {
@@ -101,12 +94,29 @@ export function spawnAgent(prompt: string, options: SpawnAgentOptions = {}): Chi
   proc.on('close', () => {
     if (agentProcess === proc) {
       agentProcess = null;
+      agentMcpConfigPath = null;
     }
   });
 
   logger.info('agent:spawn', { pid: agentProcess.pid, seq, spawned: !!agentProcess.pid });
 
   return agentProcess;
+}
+
+export function sendAgentMessage(prompt: string): void {
+  const proc = ensureAgentProcess();
+  if (!proc.stdin || proc.stdin.destroyed) {
+    throw new Error('Agent stdin is not writable');
+  }
+  const payload = {
+    type: 'user',
+    message: {
+      role: 'user',
+      content: prompt,
+    },
+  };
+  proc.stdin.write(`${JSON.stringify(payload)}\n`);
+  logger.info('agent:stdin', { pid: proc.pid, chars: prompt.length });
 }
 
 export function killAgent(): void {
@@ -119,6 +129,10 @@ export function killAgent(): void {
     old.kill('SIGKILL');
     agentProcess = null;
     agentSeq++;
+  }
+  if (agentMcpConfigPath) {
+    try { fs.unlinkSync(agentMcpConfigPath); } catch { /* ignore */ }
+    agentMcpConfigPath = null;
   }
 }
 
@@ -235,6 +249,7 @@ function readDeepSeekApiKey(): string | null {
       if (!line || line.startsWith('#')) continue;
       const match = line.match(/^DEEPSEEK_API_KEY\s*=\s*(.+)$/);
       if (match?.[1]) return match[1].trim();
+      return line;
     }
   } catch {
     // Missing key file is handled by caller.

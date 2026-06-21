@@ -1,8 +1,9 @@
 export interface ParsedChunk {
-  type: 'text' | 'thinking' | 'tool_call' | 'tool_result' | 'system' | 'error' | 'init';
+  type: 'text' | 'thinking' | 'tool_call' | 'tool_result' | 'system' | 'error' | 'init' | 'result';
   content: string;
   toolName?: string;
   mcpServers?: Array<{ name: string; status: string }>;
+  isError?: boolean;
 }
 
 export class ChatBuffer {
@@ -82,11 +83,12 @@ export class ChatBuffer {
       if (msg.type === 'result') {
         if (msg.is_error) {
           return {
-            type: 'error',
+            type: 'result',
             content: msg.result || `任务失败${msg.api_error_status ? ` (status: ${msg.api_error_status})` : ''}`,
+            isError: true,
           };
         }
-        return { type: 'system', content: `完成: ${msg.subtype || msg.result || ''}` };
+        return { type: 'result', content: msg.result || msg.subtype || 'completed', isError: false };
       }
 
       return null;

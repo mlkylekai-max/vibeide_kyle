@@ -38,7 +38,7 @@ function checkApiKey(): boolean {
   try {
     if (fs.existsSync(keyPath)) {
       const content = fs.readFileSync(keyPath, 'utf-8').trim();
-      if (content.includes('DEEPSEEK_API_KEY=') && !content.includes('sk-your-key-here')) {
+      if (isUsableApiKeyContent(content)) {
         return true;
       }
     }
@@ -57,7 +57,7 @@ function tryCopyKeyFromResources(destPath: string): boolean {
     if (!fs.existsSync(srcPath)) return false;
 
     const content = fs.readFileSync(srcPath, 'utf-8').trim();
-    if (!content.includes('DEEPSEEK_API_KEY=') || content.includes('sk-your-key-here')) return false;
+    if (!isUsableApiKeyContent(content)) return false;
 
     const dir = path.dirname(destPath);
     fs.mkdirSync(dir, { recursive: true });
@@ -68,6 +68,17 @@ function tryCopyKeyFromResources(destPath: string): boolean {
     logger.warn('first-run:apikey-copy-failed', { error: String(err) });
     return false;
   }
+}
+
+function isUsableApiKeyContent(content: string): boolean {
+  for (const rawLine of content.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith('#')) continue;
+    if (line.includes('sk-your-key-here')) return false;
+    if (/^DEEPSEEK_API_KEY\s*=\s*\S+/.test(line)) return true;
+    return line.length > 12;
+  }
+  return false;
 }
 
 /** 检查 Playwright 浏览器是否存在 */

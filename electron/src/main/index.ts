@@ -6,6 +6,7 @@ import { startGateway } from './gateway';
 import { logger } from './worker/logger';
 import { getChromeProfileDir, getResourcesDir, isDev } from './paths';
 import { checkStartupStatus, saveApiKey } from './first-run';
+import { killAgent } from './agent';
 
 app.commandLine.appendSwitch('remote-debugging-port', '9230');
 app.disableHardwareAcceleration();
@@ -39,6 +40,7 @@ async function shutdownApp(reason: string): Promise<void> {
 
   shutdownInFlight = (async () => {
     logger.warn('browser:view-event', { event: 'shutdown', reason });
+    killAgent();
     await flushBrowserStorage();
 
     if (mainWindow && !mainWindow.isDestroyed()) {

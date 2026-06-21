@@ -1,13 +1,11 @@
 import { BrowserWindow } from 'electron';
-import { spawnAgent, killAgent, getAgentProcess } from '../agent';
+import { ensureAgentProcess, killAgent, getAgentProcess, sendAgentMessage } from '../agent';
 import { loadURL, getBrowserView } from '../browser-view';
 import { TaskStateMachine } from './task-state';
 import { buildContext } from './context';
 import { ChatBuffer, ParsedChunk } from './chat-buffer';
 import { logger } from './logger';
-import { tryHandleQuickTask } from './quick-tasks';
 import { isHtmlGameTask, validateCurrentPage } from './page-validator';
-import { buildSearchPreflightPlan, buildSearchPreflightPrompt, SearchPreflightPlan } from './search-preflight';
 import { appendClaudeSessionTurn, buildClaudeSessionContext, getClaudeSessionFile } from './session-store';
 
 export type PushUIFn = (channel: string, data: unknown) => void;
@@ -20,6 +18,11 @@ export class Orchestrator {
   private currentTask: string | null = null;
   private currentAgentTranscript = '';
   private currentAttempt = 0;
+  private observedAgentPid: number | null = null;
+  private pendingTasks: string[] = [];
+  private silenceTimer: NodeJS.Timeout | null = null;
+  private turnStartedAt = 0;
+  private lastAgentOutputAt = 0;
   private readonly maxValidationRetries = 2;
 
   constructor(mainWindow: BrowserWindow, pushUI: PushUIFn) {
@@ -34,6 +37,7 @@ export class Orchestrator {
     });
 
     logger.info('task:state', { phase: 'init', msg: 'Orchestrator created' });
+    this.ensurePersistentAgent();
   }
 
   async handleTask(task: string): Promise<void> {
@@ -59,89 +63,8 @@ export class Orchestrator {
     logger.info('task:start', { task });
     this.currentAgentTranscript = '';
 
-    if (getAgentProcess()) {
-      logger.warn('agent:kill', { reason: 'new task, killing old agent' });
-      killAgent();
-    }
-
     if (!validationFeedback) {
       this.state.start(task);
-    }
-
-    const browserView = getBrowserView();
-    if (!validationFeedback && browserView) {
-      try {
-        const quickResult = await tryHandleQuickTask(task, browserView);
-        if (quickResult.handled) {
-          logger.info('task:complete', {
-            mode: 'quick-task',
-            task,
-            label: quickResult.label,
-            url: quickResult.url,
-            screenshotPath: quickResult.screenshotPath,
-          });
-          this.pushUI('chat:message', {
-            text: `[Worker] 已通过 Electron 内置快捷流程完成：${quickResult.label}`,
-            timestamp: Date.now(),
-          });
-          if (quickResult.message) {
-            this.pushUI('chat:message', {
-              text: quickResult.message,
-              timestamp: Date.now(),
-            });
-          }
-          if (quickResult.url) {
-            this.pushUI('chat:message', {
-              text: `[Worker] 当前页面: ${quickResult.url}`,
-              timestamp: Date.now(),
-            });
-          }
-          if (quickResult.screenshotPath) {
-            this.pushUI('chat:message', {
-              text: `[Worker] 截图已保存: ${quickResult.screenshotPath}`,
-              timestamp: Date.now(),
-            });
-          }
-          this.state.advanceTo('navigating');
-          this.state.complete();
-          appendClaudeSessionTurn({
-            user: task,
-            assistant: quickResult.message || `[Worker] 已通过 Electron 内置快捷流程完成：${quickResult.label}`,
-            status: 'completed',
-          });
-          this.pushUI('task:complete', { code: 0 });
-          this.currentTask = null;
-          return;
-        }
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        logger.warn('quick-task:error', { task, message });
-        this.pushUI('chat:message', {
-          text: `[Worker] 快捷打开失败，改走常规任务链路: ${message}`,
-          timestamp: Date.now(),
-          error: true,
-        });
-      }
-    }
-
-    const searchPreflight = !validationFeedback && browserView
-      ? buildSearchPreflightPlan(task, browserView.webContents.getURL())
-      : null;
-    let appliedSearchPreflight: SearchPreflightPlan | null = null;
-
-    if (searchPreflight && browserView) {
-      try {
-        await this.runSearchPreflight(searchPreflight, browserView);
-        appliedSearchPreflight = searchPreflight;
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        logger.warn('search:preflight', { ok: false, task, message, plan: searchPreflight });
-        this.pushUI('chat:message', {
-          text: `[Worker] 搜索预处理失败，改走常规 Agent 链路: ${message}`,
-          timestamp: Date.now(),
-          error: true,
-        });
-      }
     }
 
     this.pushUI('chat:message', {
@@ -149,12 +72,9 @@ export class Orchestrator {
       timestamp: Date.now(),
     });
 
-    const taskWithPreflight = appliedSearchPreflight
-      ? `${task}\n\n${buildSearchPreflightPrompt(appliedSearchPreflight)}`
-      : task;
     const effectiveTask = validationFeedback
-      ? `${taskWithPreflight}\n\n【上一版页面验收失败，必须修正后重新生成】\n${validationFeedback}`
-      : taskWithPreflight;
+      ? `${task}\n\n【上一版页面验收失败，必须修正后重新生成】\n${validationFeedback}`
+      : task;
     const sessionContext = buildClaudeSessionContext();
     const taskForContext = `${sessionContext.text}\n${effectiveTask}`;
     const { prompt, skillsFound } = buildContext(taskForContext);
@@ -186,15 +106,29 @@ export class Orchestrator {
       timestamp: Date.now(),
     });
 
-    logger.info('agent:spawn', { task: task.slice(0, 100) });
-    const proc = spawnAgent(prompt, { continueSession: sessionContext.session.turnCount > 0 });
-    logger.info('agent:spawn', {
-      pid: proc.pid,
-      started: !!proc.pid,
-      continueSession: sessionContext.session.turnCount > 0,
+    const proc = this.ensurePersistentAgent();
+    this.pendingTasks.push(task);
+    this.currentTask = this.pendingTasks[0] ?? task;
+    this.turnStartedAt = Date.now();
+    this.lastAgentOutputAt = this.turnStartedAt;
+    this.startSilenceTimer();
+
+    this.pushUI('chat:message', {
+      text: `[Agent] 使用 Claude Code PID ${proc.pid}`,
+      timestamp: Date.now(),
     });
 
+    sendAgentMessage(prompt);
+  }
+
+  private ensurePersistentAgent(): NonNullable<ReturnType<typeof getAgentProcess>> {
+    const proc = ensureAgentProcess();
+    if (this.observedAgentPid === proc.pid) {
+      return proc;
+    }
+
     proc.stdout?.on('data', (chunk: Buffer) => {
+      this.lastAgentOutputAt = Date.now();
       const text = chunk.toString();
       logger.stdout(text);
       const parsed = this.buffer.feed(text);
@@ -205,6 +139,7 @@ export class Orchestrator {
     });
 
     proc.stderr?.on('data', (chunk: Buffer) => {
+      this.lastAgentOutputAt = Date.now();
       const text = chunk.toString().trim();
       if (text) {
         logger.stderr(text);
@@ -213,7 +148,11 @@ export class Orchestrator {
     });
 
     proc.on('close', (code) => {
-      void this.handleAgentClose(code ?? 1, task);
+      this.stopSilenceTimer();
+      this.observedAgentPid = null;
+      if (this.pendingTasks.length > 0 || this.currentTask) {
+        void this.handleAgentProcessExit(code ?? 1);
+      }
     });
 
     proc.on('error', (err) => {
@@ -226,10 +165,14 @@ export class Orchestrator {
       this.state.fail();
       this.currentTask = null;
     });
+
+    this.observedAgentPid = proc.pid ?? null;
+    logger.info('agent:spawn', { pid: proc.pid, started: !!proc.pid, persistent: true });
+    return proc;
   }
 
-  private async handleAgentClose(code: number, task: string): Promise<void> {
-    logger.info('agent:close', { exitCode: code });
+  private async handleAgentTurnComplete(code: number, task: string): Promise<void> {
+    logger.info('agent:turn-complete', { exitCode: code, task: task.slice(0, 100) });
 
     const remaining = this.buffer.flush();
     for (const p of remaining) {
@@ -274,6 +217,8 @@ export class Orchestrator {
               error: true,
             });
 
+            this.pendingTasks.shift();
+            this.currentTask = this.pendingTasks[0] ?? null;
             await this.runTask(task, feedback);
             return;
           }
@@ -286,7 +231,11 @@ export class Orchestrator {
             });
             this.state.fail();
             this.pushUI('task:complete', { code: 2 });
-            this.currentTask = null;
+            this.pendingTasks.shift();
+            this.currentTask = this.pendingTasks[0] ?? null;
+            if (!this.currentTask) {
+              this.stopSilenceTimer();
+            }
             return;
           }
         }
@@ -315,38 +264,46 @@ export class Orchestrator {
         status: 'failed',
       });
       this.pushUI('chat:message', {
-        text: '当前远端 Agent 通道不可用。可先直接使用“打开网页 / B站 / 股票搜索 / 贪吃蛇”这类本地快捷能力。',
+        text: '当前 Agent 通道不可用，请检查 apikey.txt 和 Claude Code 进程日志。',
         timestamp: Date.now(),
         error: true,
       });
     }
 
     this.pushUI('task:complete', { code });
-    this.currentTask = null;
+    this.pendingTasks.shift();
+    this.currentTask = this.pendingTasks[0] ?? null;
+    if (!this.currentTask) {
+      this.stopSilenceTimer();
+    } else {
+      this.turnStartedAt = Date.now();
+      this.lastAgentOutputAt = this.turnStartedAt;
+    }
   }
 
-  private async runSearchPreflight(plan: SearchPreflightPlan, browserView: NonNullable<ReturnType<typeof getBrowserView>>): Promise<void> {
-    logger.info('search:preflight', { ok: true, plan });
-    this.state.advanceTo('navigating');
+  private async handleAgentProcessExit(code: number): Promise<void> {
+    logger.info('agent:close', { exitCode: code, pendingTasks: this.pendingTasks.length });
+    const task = this.pendingTasks[0] ?? this.currentTask ?? 'unknown';
     this.pushUI('chat:message', {
-      text: `[Worker] 搜索预处理：${plan.reason}，先打开 ${plan.platform} 搜索页（关键词：${plan.keyword}）`,
+      text: `[Agent] Claude Code 进程已退出 (code: ${code})`,
       timestamp: Date.now(),
+      error: code !== 0,
     });
-
-    try {
-      await browserView.webContents.loadURL(plan.url);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      if (!message.includes('ERR_ABORTED')) {
-        throw error;
-      }
+    if (this.currentTask) {
+      appendClaudeSessionTurn({
+        user: this.currentTask,
+        assistant: this.currentAgentTranscript || `[Agent] 进程退出 (code: ${code})`,
+        status: code === 0 ? 'completed' : 'failed',
+      });
     }
-
-    await new Promise((resolve) => setTimeout(resolve, 2200));
-    logger.info('search:preflight', {
-      currentUrl: browserView.webContents.getURL(),
-      title: browserView.webContents.getTitle(),
-    });
+    if (code === 0) {
+      this.state.complete();
+    } else {
+      this.state.fail();
+    }
+    this.pendingTasks = [];
+    this.currentTask = null;
+    this.pushUI('task:complete', { code });
   }
 
   private handleParsedChunk(p: ParsedChunk): void {
@@ -367,6 +324,22 @@ export class Orchestrator {
       }
 
       logger.info('mcp:init', { mcpServers: p.mcpServers });
+      return;
+    }
+
+    if (p.type === 'result') {
+      const task = this.pendingTasks[0] ?? this.currentTask;
+      if (p.isError && p.content) {
+        this.currentAgentTranscript += `${p.content}\n`;
+        this.pushUI('chat:message', {
+          text: p.content,
+          timestamp: Date.now(),
+          error: true,
+        });
+      }
+      if (task) {
+        void this.handleAgentTurnComplete(p.isError ? 1 : 0, task);
+      }
       return;
     }
 
@@ -392,6 +365,28 @@ export class Orchestrator {
         this.state.advanceTo('cleaning');
       }
     }
+  }
+
+  private startSilenceTimer(): void {
+    if (this.silenceTimer) return;
+    this.silenceTimer = setInterval(() => {
+      if (!this.currentTask || this.pendingTasks.length === 0) return;
+      const now = Date.now();
+      if (now - this.lastAgentOutputAt < 5000) return;
+      const seconds = Math.floor((now - this.turnStartedAt) / 1000);
+      this.lastAgentOutputAt = now;
+      this.pushUI('chat:message', {
+        text: `[Agent] 思考中... ${seconds}s`,
+        timestamp: now,
+      });
+      logger.info('agent:silence', { seconds, task: this.currentTask.slice(0, 100) });
+    }, 1000);
+  }
+
+  private stopSilenceTimer(): void {
+    if (!this.silenceTimer) return;
+    clearInterval(this.silenceTimer);
+    this.silenceTimer = null;
   }
 
   pause(): void {
