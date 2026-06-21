@@ -95,7 +95,7 @@ rmdir /S /Q hardboard\projects\wifi_connect_fmai\build
 node dist\index.js hardboard:build hardboard\projects\wifi_connect_fmai
 ```
 
-如果仍然报 `bits/c++config.h` 或 `bits/stl_iterator_base_types.h`，不要继续改业务源码。应优先修 runtime 的 toolchain include 注入，或在具体 ESP-IDF 工程顶层 `CMakeLists.txt` 临时补 C++ include workaround，并重新打包验证。修复后用打包版 runtime 执行：
+runtime 会根据工程 `sdkconfig` / `sdkconfig.defaults` 识别 `CONFIG_IDF_TARGET`，并把对应 Xtensa GCC C++ multilib include 目录注入 `CPLUS_INCLUDE_PATH`。如果仍然报 `bits/c++config.h` 或 `bits/stl_iterator_base_types.h`，不要继续改业务源码；应先检查 runtime 注入的 include 路径是否存在，必要时再在具体 ESP-IDF 工程顶层 `CMakeLists.txt` 临时补 workaround，并重新打包验证。修复后用打包版 runtime 执行：
 
 ```cmd
 cd /d C:\vibeide\electron\dist-package\win-unpacked\resources\runtime
@@ -166,11 +166,11 @@ find <project> -path '*/build' -prune -o -type f -print
   - `electron/dist-package/奥德赛0.0-0.3.0-win-x64.exe`
   - `electron/dist-package/奥德赛0.0-0.3.0-win-x64.exe.blockmap`
 - 打包版 runtime 的输出压缩机制已验证：`hardboard:build` 会返回 compact JSON 和 `stdoutLogPath` / `stderrLogPath`，不会再把 15 万字符直接塞回 Agent。
-- 最近一次打包版 runtime 相对路径编译暴露了新的 C++ multilib include 问题，下一位接力必须先修复并复测，不能直接宣称通过：
+- 最近一次打包版 runtime 相对路径编译暴露了新的 C++ multilib include 问题；runtime 已增加 target-aware `CPLUS_INCLUDE_PATH` 注入，下一位接力必须重新打包复测后才能宣称通过：
   - 命令：`node dist\index.js hardboard:build hardboard\projects\wifi_connect_fmai`
   - `cwd`：`%LOCALAPPDATA%\vibeide-hardboard-runtime\hardboard\projects\wifi_connect_fmai`
   - 失败症状：`fatal error: bits/c++config.h: No such file or directory`
-  - 处理方向：清理 build 后复测；若仍失败，修 runtime toolchain C++ include 注入或工程 CMake workaround，再重新打包。
+  - 处理方向：清理 build 后复测；若仍失败，检查 runtime toolchain C++ include 注入或工程 CMake workaround，再重新打包。
 - 打包版 runtime 烧录只有在上述 build 重新通过后才允许继续跑：
   - 命令：`node dist\index.js hardboard:flash hardboard\projects\wifi_connect_fmai COM3`
   - 成功标准：`COM3` 识别为 ESP32-S3，写入和 hash verified 均成功。
@@ -185,6 +185,7 @@ find <project> -path '*/build' -prune -o -type f -print
 - `ESP_ROM_ELF_DIR`
 - `IDF_PYTHON_CHECK_CONSTRAINTS=no`
 - `PATH`：自动追加 Python venv、ESP-IDF tools、已安装工具链 bin 目录。
+- `CPLUS_INCLUDE_PATH`：自动追加当前 target 对应的 Xtensa GCC C++ multilib include，例如 `xtensa-esp-elf/include/c++/14.2.0/xtensa-esp-elf/esp32s3/no-rtti`。
 
 Windows 打包配置包含 `runtime/hardboard`，但排除 ESP-IDF 自带 `examples/**`，避免 NSIS/7zip 处理 Unix 脚本路径时报错。奥德赛0.0 自己的 `runtime/hardboard/example/**` 保留。
 

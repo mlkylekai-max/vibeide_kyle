@@ -266,7 +266,7 @@ export async function runIdfCommand(
 
   fs.mkdirSync(RUNTIME_DIRS.hardboardLogs, { recursive: true });
   const commandArgs = [idfPy, ...args];
-  const env = buildIdfEnv(idfPath, version);
+  const env = buildIdfEnv(idfPath, version, resolvedProjectDir);
   const logBase = createIdfLogBase(args, resolvedProjectDir);
   try {
     const { stdout, stderr } = await execFileAsync(python, commandArgs, {
@@ -428,7 +428,7 @@ function resolvePython(version = DEFAULT_IDF_VERSION): string | null {
   return null;
 }
 
-function buildIdfEnv(idfPath: string, version: string): NodeJS.ProcessEnv {
+function buildIdfEnv(idfPath: string, version: string, projectDir?: string): NodeJS.ProcessEnv {
   const toolsDir = path.join(idfPath, 'tools');
   const idfToolsPath = resolveIdfToolsPath();
   const idfPythonEnvPath = resolveIdfPythonEnvPath(version);
@@ -436,6 +436,7 @@ function buildIdfEnv(idfPath: string, version: string): NodeJS.ProcessEnv {
   const pythonBin = idfPythonEnvPath ? path.join(idfPythonEnvPath, process.platform === 'win32' ? 'Scripts' : 'bin') : '';
   const installedToolPaths = discoverInstalledIdfToolPaths(idfToolsPath);
   const espRomElfDir = resolveEspRomElfDir(idfToolsPath);
+  const cxxIncludePaths = resolveXtensaCxxIncludePaths(idfToolsPath, projectDir);
   return {
     ...process.env,
     IDF_PATH: idfPath,
@@ -445,8 +446,71 @@ function buildIdfEnv(idfPath: string, version: string): NodeJS.ProcessEnv {
     IDF_PYTHON_CHECK_CONSTRAINTS: 'no',
     ESP_IDF_VERSION: version,
     VIBEIDE_HARDBOARD_ROOT: RUNTIME_DIRS.hardboard,
+    ...(cxxIncludePaths.length > 0 ? {
+      CPLUS_INCLUDE_PATH: mergePathList(cxxIncludePaths, process.env.CPLUS_INCLUDE_PATH),
+    } : {}),
     PATH: [pythonBin, toolsDir, ...installedToolPaths, oldPath].filter(Boolean).join(path.delimiter),
   };
+}
+
+function resolveXtensaCxxIncludePaths(idfToolsPath: string, projectDir?: string): string[] {
+  const target = resolveProjectTarget(projectDir);
+  const root = path.join(idfToolsPath, 'tools', 'xtensa-esp-elf');
+  if (!fs.existsSync(root)) return [];
+
+  const matches: string[] = [];
+  const queue: Array<{ dir: string; depth: number }> = [{ dir: root, depth: 0 }];
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (!current) continue;
+
+    let entries: fs.Dirent[];
+    try {
+      entries = fs.readdirSync(current.dir, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+
+    if (
+      path.basename(current.dir).toLowerCase() === target
+      && fs.existsSync(path.join(current.dir, 'bits', 'c++config.h'))
+    ) {
+      matches.push(current.dir);
+    }
+
+    const noRtti = path.join(current.dir, target, 'no-rtti');
+    if (fs.existsSync(path.join(noRtti, 'bits', 'c++config.h'))) {
+      matches.push(noRtti);
+    }
+
+    if (current.depth >= 10) continue;
+    for (const entry of entries) {
+      if (entry.isDirectory()) queue.push({ dir: path.join(current.dir, entry.name), depth: current.depth + 1 });
+    }
+  }
+
+  return [...new Set(matches)].sort((a, b) => {
+    const aNoRtti = a.endsWith(`${path.sep}no-rtti`) ? 0 : 1;
+    const bNoRtti = b.endsWith(`${path.sep}no-rtti`) ? 0 : 1;
+    return aNoRtti - bNoRtti || b.length - a.length;
+  });
+}
+
+function resolveProjectTarget(projectDir?: string): string {
+  if (!projectDir) return 'esp32s3';
+  const files = ['sdkconfig', 'sdkconfig.defaults'];
+  for (const file of files) {
+    const configPath = path.join(projectDir, file);
+    if (!fs.existsSync(configPath)) continue;
+    const content = fs.readFileSync(configPath, 'utf-8');
+    const match = content.match(/^CONFIG_IDF_TARGET="?([a-z0-9_]+)"?/m);
+    if (match?.[1]) return match[1];
+  }
+  return 'esp32s3';
+}
+
+function mergePathList(paths: string[], existing?: string): string {
+  return [...paths, existing || ''].filter(Boolean).join(path.delimiter);
 }
 
 function discoverInstalledIdfToolPaths(idfToolsPath: string): string[] {

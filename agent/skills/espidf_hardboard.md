@@ -21,7 +21,7 @@
 - Windows 打包版 runtime 会自动把 hardboard 映射到短路径 `%LOCALAPPDATA%\vibeide-hardboard-runtime\hardboard`。
 - 如果用户贴出 `bits/c++config.h: No such file or directory` 或 `bits/stl_iterator_base_types.h: No such file or directory`，先检查 `hardboard.env_status` 是否已经显示短路径；这个错误通常不是业务源码问题，而是打包长路径、旧 build 缓存或 Xtensa GCC C++ multilib include 未注入。
 - 旧 build 缓存可能记录旧 Python 或旧路径；runtime 会自动删 `build` 并重试一次，但排查时仍要留意 `Run 'idf.py fullclean'` 相关提示。
-- 如果清理 build 后仍缺 `bits/*`，不要继续改 `main/*.c`；应修 runtime toolchain include 注入，或临时在顶层 `CMakeLists.txt` 给 C++ 编译追加 `xtensa-esp-elf/include/c++/14.2.0/xtensa-esp-elf/esp32s3/no-rtti`，再重新打包复测。
+- runtime 会按工程 target 自动给 `CPLUS_INCLUDE_PATH` 注入 Xtensa GCC C++ multilib include，例如 `xtensa-esp-elf/include/c++/14.2.0/xtensa-esp-elf/esp32s3/no-rtti`。如果清理 build 后仍缺 `bits/*`，不要继续改 `main/*.c`；应先检查该目录是否存在和是否被注入，必要时临时在顶层 `CMakeLists.txt` 追加同一路径，再重新打包复测。
 
 ## 先读资料
 
@@ -82,4 +82,4 @@
 - `runtime/hardboard/projects/hello_world_esp32s3` 已完成 set-target/build。
 - ESP32-S3 板子在 `COM3` 烧录成功。
 - 打包产物正式名使用 `奥德赛0.0`，目录仍是 `win-unpacked`。
-- 打包版 runtime 已验证 compact JSON 输出不会溢出 Agent；`hardboard\projects\wifi_connect_fmai` 的打包版 build 最近遇到 `bits/c++config.h`，需要修 C++ include 后重新验证 build/flash。
+- 打包版 runtime 已验证 compact JSON 输出不会溢出 Agent；`hardboard\projects\wifi_connect_fmai` 的打包版 build 最近遇到 `bits/c++config.h`，runtime 已加 C++ include 注入，仍需重新打包验证 build/flash。
