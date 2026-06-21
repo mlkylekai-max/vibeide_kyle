@@ -2,6 +2,7 @@
 __pycache__/
 .pytest_cache/
 .mypy_cache/
+.cache/
 runtime/browser_runtime/
 runtime/chrome_profile/
 runtime/cookies/
@@ -20,6 +21,7 @@ runtime/hardboard/**/managed_components/
 runtime/hardboard/**/dependencies.lock
 runtime/hardboard/**/sdkconfig
 runtime/hardboard/**/wifi_secrets.h
+runtime/hardboard/logs/
 runtime/hardboard/esptools/esp-idf-v*/
 runtime/hardboard/esptools/idf-tools/
 workplaces/
