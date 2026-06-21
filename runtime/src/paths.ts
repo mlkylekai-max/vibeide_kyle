@@ -10,8 +10,8 @@ function resolveRuntimeRoot(): string {
   if (process.env.RUNTIME_ROOT) return path.resolve(process.env.RUNTIME_ROOT);
 
   const cwd = process.cwd();
-  if (fs.existsSync(path.join(cwd, 'hardboard'))) return path.resolve(cwd);
   if (fs.existsSync(path.join(cwd, 'runtime', 'hardboard'))) return path.resolve(cwd, 'runtime');
+  if (fs.existsSync(path.join(cwd, 'hardboard'))) return path.resolve(cwd);
   return path.resolve(cwd);
 }
 
