@@ -22,14 +22,15 @@ export function buildAgentSystemPrompt(): string {
     `只读资源区：${AGENT_DIR}`,
     '',
     '硬性规则：',
-    '1. 展示关键过程：要说明正在写入哪个文件、调用哪个工具、为什么改动、下一步做什么；避免无意义重复刷屏。',
+    '1. 展示关键过程：先用 1-3 行说明执行计划；每个阶段开始前输出一句短进度，说明正在写入哪个文件、调用哪个工具、为什么改动、下一步做什么；避免无意义重复刷屏。',
     '2. 用户说“不要打开 / 先不打开 / 只写代码”时，只创建或修改文件，禁止 browser.navigate，禁止截图验收。',
     '3. 用户说“打开 / 运行 / 看效果”时，才使用 browser.navigate 打开对应文件或页面。',
     '4. 所有浏览器操作必须走 MCP browser.* 工具，禁止用系统 Chrome、Playwright 脚本、curl/wget 替代。',
     '5. browser.* 报 Target closed 时，先重试 browser.getState 或 browser.navigate；不要立刻要求用户重开 Electron。',
     '6. 写 HTML/小游戏/代码时，默认保存到可写工作区；不要写到只读资源区。若用户要求打开，必须在 Electron BrowserView 内打开并截图自检。',
     '7. 生成游戏要有开始页、清晰角色/目标/操作提示、响应式尺寸，不能只有黑底小画布。',
-    '8. 文件路径和结果说明要简短明确。',
+    '8. 长文件不要憋到最后一次性输出：先立刻创建最小可运行骨架文件，再用 Edit/MultiEdit 分阶段补 UI、逻辑、验收修复，让用户持续看到执行轨迹。',
+    '9. 文件路径和结果说明要简短明确。',
     '',
     rules ? `项目附加规则：\n${rules}` : '',
   ].filter(Boolean).join('\n');
@@ -56,7 +57,13 @@ export function buildContext(task: string): TaskContext {
     shouldNotOpen ? '【执行模式】只写文件/代码，不打开、不截图。' : '',
     wantsOpen ? '【执行模式】打开或运行当前目标，必要时截图确认。' : '',
     isHtmlGameTask(task)
-      ? '【HTML 游戏要求】必须有可见角色/目标/开始页/操作提示；画面响应式铺开；若打开后截图发现角色不可见或布局异常，直接修复再汇报。'
+      ? [
+        '【HTML 游戏要求】',
+        'A. 必须有可见角色/目标/开始页/操作提示；画面响应式铺开。',
+        'B. 先创建最小可运行 HTML 骨架，再分阶段补游戏逻辑、样式、移动端控制和验收修复；不要长时间沉默后一次性 Write 完整大文件。',
+        'C. 每次写入/修改前先用一句话说明当前阶段，例如“先创建骨架文件”“补充关卡逻辑”“打开截图验收”。',
+        'D. 若打开后截图发现角色不可见或布局异常，直接修复再汇报。',
+      ].join('\n')
       : '',
     platformRules,
     '',
@@ -116,7 +123,7 @@ function buildPlatformRules(task: string): string {
 }
 
 function isHtmlGameTask(task: string): boolean {
-  return /(html.*游戏|游戏.*html|小游戏|贪吃蛇|马里奥|坦克大战|platformer|game)/i.test(task);
+  return /(html.*游戏|游戏.*html|小游戏|游戏|贪吃蛇|马里奥|坦克大战|推箱子|迷宫|走迷宫|galgame|视觉小说|platformer|sokoban|maze|game)/i.test(task);
 }
 
 function readRules(): string {

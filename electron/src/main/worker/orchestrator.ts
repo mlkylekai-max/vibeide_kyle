@@ -94,6 +94,12 @@ export class Orchestrator {
       text: `[Agent] PID ${proc.pid}${skillsFound.length ? ` · ${skillsFound.join(', ')}` : ''}`,
       timestamp: Date.now(),
     });
+    if (!validationFeedback) {
+      this.pushUI('chat:message', {
+        text: this.describeExecutionPlan(task),
+        timestamp: Date.now(),
+      });
+    }
 
     sendAgentMessage(prompt);
   }
@@ -374,6 +380,26 @@ export class Orchestrator {
     if (!this.silenceTimer) return;
     clearInterval(this.silenceTimer);
     this.silenceTimer = null;
+  }
+
+  private describeExecutionPlan(task: string): string {
+    if (isHtmlGameTask(task)) {
+      const shouldNotOpen = /(不要打开|先不打开|不用打开|别打开|只写|先写)/i.test(task);
+      return [
+        '[Worker] 执行计划',
+        '1. 先在工作区创建可运行 HTML 骨架，让文件尽早落地。',
+        '2. 分阶段补游戏逻辑、界面和操作控制，工具调用会逐条显示。',
+        shouldNotOpen
+          ? '3. 本轮按要求不打开、不截图，只汇报文件路径。'
+          : '3. 打开到右侧 BrowserView 截图验收，发现显示问题就继续修。',
+      ].join('\n');
+    }
+
+    if (/(打开|运行|看效果|预览|截图)/i.test(task)) {
+      return '[Worker] 执行计划\n1. 定位目标文件或页面。\n2. 打开到右侧 BrowserView。\n3. 截图或读取状态确认结果。';
+    }
+
+    return '[Worker] 执行计划\n1. 读取必要上下文。\n2. 执行修改或工具操作。\n3. 汇报关键结果。';
   }
 
   pause(): void {

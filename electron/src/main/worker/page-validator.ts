@@ -25,7 +25,7 @@ export interface PageValidationResult {
 }
 
 export function isHtmlGameTask(task: string): boolean {
-  return /(html.*游戏|游戏.*html|小游戏|贪吃蛇|马里奥|坦克大战|platformer|game)/i.test(task);
+  return /(html.*游戏|游戏.*html|小游戏|游戏|贪吃蛇|马里奥|坦克大战|推箱子|迷宫|走迷宫|galgame|视觉小说|platformer|sokoban|maze|game)/i.test(task);
 }
 
 export async function validateCurrentPage(view: BrowserSurface, task: string): Promise<PageValidationResult | null> {
