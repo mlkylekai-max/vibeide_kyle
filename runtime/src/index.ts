@@ -24,6 +24,7 @@ export {
   runIdfEraseFlash,
   runIdfFlash,
   runIdfSetTarget,
+  runSerialCapture,
 } from './hardboard.js';
 
 async function runCli(): Promise<void> {
@@ -85,6 +86,19 @@ async function runCli(): Promise<void> {
   if (command === 'hardboard:flash') {
     const { runIdfFlash } = await import('./hardboard.js');
     const result = await runIdfFlash(process.argv[3] || RUNTIME_DIRS.hardboardProjects, process.argv[4] || '', process.argv[5]);
+    console.log(JSON.stringify(result, null, 2));
+    process.exitCode = result.exitCode;
+    return;
+  }
+
+  if (command === 'hardboard:serial') {
+    const { runSerialCapture } = await import('./hardboard.js');
+    const result = await runSerialCapture(
+      process.argv[3] || '',
+      Number.parseInt(process.argv[4] || '20', 10),
+      Number.parseInt(process.argv[5] || '115200', 10),
+      process.argv[6],
+    );
     console.log(JSON.stringify(result, null, 2));
     process.exitCode = result.exitCode;
     return;

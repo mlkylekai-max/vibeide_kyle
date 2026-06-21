@@ -48,6 +48,7 @@ hardboard.snapshot_create
 hardboard.idf_set_target
 hardboard.idf_build
 hardboard.idf_flash
+hardboard.serial_capture
 hardboard.idf_clean
 hardboard.idf_erase_flash
 ```
@@ -55,7 +56,7 @@ hardboard.idf_erase_flash
 ## 已验证状态
 
 - Windows 仓库：`C:\vibeide`。
-- 当前 GitHub main：`64c6970`。
+- 当前 GitHub main：以仓库 `main` 分支为准。
 - Windows 发现串口：`COM3`、`COM8`、`COM9`。
 - ESP32-S3 实测端口：`COM3`。
 - `npm --prefix runtime run smoke:hardboard` 已通过：
@@ -69,6 +70,7 @@ hardboard.idf_erase_flash
   - USB 模式：USB-Serial/JTAG。
   - MAC：`cc:ba:97:01:3a:dc`。
   - bootloader、app、partition table 均 hash verified。
+- `hardboard.serial_capture` 用于 SSH/Agent 下非交互读取串口日志，替代需要 TTY 的 `idf.py monitor`。
 - Windows 打包已通过：
   - `electron/dist-package/win-unpacked/vibeide.exe`
   - `electron/dist-package/vibeide-0.3.0-win-x64.exe`
@@ -93,10 +95,11 @@ Windows 打包配置包含 `runtime/hardboard`，但排除 ESP-IDF 自带 `examp
 - 新工程放在 `runtime/hardboard/projects/<project-name>`，不要直接改原始 example。
 - 大改前调用 `hardboard.snapshot_create`。
 - 编译必须调用 `hardboard.idf_build`；烧录必须调用 `hardboard.devices_list` 后再 `hardboard.idf_flash`。
+- 用户要求“测试运行/联网/板子情况”时，烧录后必须调用 `hardboard.serial_capture` 或等价串口日志采集。
 - 不允许只凭文件生成或口头描述宣称编译/烧录成功。
 
 ## 后续增强
 
-- 增加串口 monitor 工具和日志面板。
+- 增加串口日志面板，把 `hardboard.serial_capture` 结果展示到右侧工作台。
 - 为 ESP32-C3/ESP32-C6 增加示例、target、真实设备记录。
 - 增加固件归档工具，把 `.bin/.elf/.map/flasher_args.json` 复制到 `runtime/hardboard/firmware`。

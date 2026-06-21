@@ -1,4 +1,5 @@
 #include <string.h>
+#include <stdbool.h>
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
@@ -20,6 +21,8 @@
 static const char *TAG = "vibeide_wifi";
 static EventGroupHandle_t wifi_event_group;
 static int retry_count;
+static bool wifi_connected;
+static esp_ip4_addr_t current_ip;
 
 static void event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
 {
@@ -29,6 +32,7 @@ static void event_handler(void *arg, esp_event_base_t event_base, int32_t event_
     }
 
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
+        wifi_connected = false;
         if (retry_count < MAXIMUM_RETRY) {
             retry_count += 1;
             ESP_LOGW(TAG, "Wi-Fi disconnected, retry %d/%d", retry_count, MAXIMUM_RETRY);
@@ -42,6 +46,8 @@ static void event_handler(void *arg, esp_event_base_t event_base, int32_t event_
     if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
         const ip_event_got_ip_t *event = (const ip_event_got_ip_t *)event_data;
         retry_count = 0;
+        wifi_connected = true;
+        current_ip = event->ip_info.ip;
         ESP_LOGI(TAG, "connected to SSID '%s'", VIBEIDE_WIFI_SSID);
         ESP_LOGI(TAG, "got ip: " IPSTR, IP2STR(&event->ip_info.ip));
         xEventGroupSetBits(wifi_event_group, WIFI_CONNECTED_BIT);
@@ -115,7 +121,11 @@ void app_main(void)
     wifi_init_sta();
 
     while (true) {
-        ESP_LOGI(TAG, "alive");
+        if (wifi_connected) {
+            ESP_LOGI(TAG, "status connected, ip: " IPSTR, IP2STR(&current_ip));
+        } else {
+            ESP_LOGW(TAG, "status waiting for Wi-Fi");
+        }
         vTaskDelay(pdMS_TO_TICKS(10000));
     }
 }

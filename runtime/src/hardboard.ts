@@ -20,6 +20,7 @@ export interface HardboardCommandResult {
   exitCode: number;
   stdout: string;
   stderr: string;
+  logPath?: string;
 }
 
 export interface HardboardSnapshotResult {
@@ -134,6 +135,77 @@ export async function runIdfEraseFlash(projectDir: string, port: string, version
 
 export async function runIdfClean(projectDir: string, version = DEFAULT_IDF_VERSION): Promise<HardboardCommandResult> {
   return runIdfCommand(resolveProjectDir(projectDir), ['fullclean'], version);
+}
+
+export async function runSerialCapture(
+  port: string,
+  durationSeconds = 20,
+  baudRate = 115200,
+  version = DEFAULT_IDF_VERSION,
+): Promise<HardboardCommandResult> {
+  if (!port.trim()) throw new Error('缺少串口端口，例如 COM3 或 /dev/ttyUSB0');
+  const python = resolvePython(version);
+  if (!python) {
+    throw new Error('未找到 Python。Windows 打包版应包含 runtime/python/python.exe 或 ESP-IDF Python 环境');
+  }
+
+  const idfPath = resolveIdfPath(version);
+  const env = idfPath ? buildIdfEnv(idfPath, version) : process.env;
+  const safePort = port.replace(/[^a-zA-Z0-9._-]+/g, '-');
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const logPath = path.join(RUNTIME_DIRS.hardboardLogs, `serial-${safePort}-${stamp}.log`);
+  fs.mkdirSync(RUNTIME_DIRS.hardboardLogs, { recursive: true });
+
+  const script = [
+    'import sys, time',
+    'try:',
+    '    import serial',
+    'except Exception as exc:',
+    '    print(f"pyserial import failed: {exc}", file=sys.stderr)',
+    '    sys.exit(2)',
+    'port = sys.argv[1]',
+    'baud = int(sys.argv[2])',
+    'seconds = float(sys.argv[3])',
+    'deadline = time.monotonic() + seconds',
+    'with serial.Serial(port, baudrate=baud, timeout=0.2) as ser:',
+    '    while time.monotonic() < deadline:',
+    '        data = ser.read(4096)',
+    '        if data:',
+    '            sys.stdout.write(data.decode("utf-8", "replace"))',
+    '            sys.stdout.flush()',
+  ].join('\n');
+  const args = ['-c', script, port, String(baudRate), String(Math.max(1, durationSeconds))];
+
+  try {
+    const { stdout, stderr } = await execFileAsync(python, args, {
+      cwd: RUNTIME_DIRS.hardboardLogs,
+      env,
+      timeout: 1000 * (Math.max(1, durationSeconds) + 8),
+      maxBuffer: 1024 * 1024 * 4,
+      windowsHide: true,
+    });
+    fs.writeFileSync(logPath, stdout, 'utf-8');
+    return {
+      command: `${python} -c <serial_capture.py> ${port} ${baudRate} ${durationSeconds}`,
+      cwd: RUNTIME_DIRS.hardboardLogs,
+      exitCode: 0,
+      stdout,
+      stderr,
+      logPath,
+    };
+  } catch (error) {
+    const err = error as NodeJS.ErrnoException & { stdout?: string; stderr?: string; code?: number };
+    const stdout = err.stdout ?? '';
+    fs.writeFileSync(logPath, stdout, 'utf-8');
+    return {
+      command: `${python} -c <serial_capture.py> ${port} ${baudRate} ${durationSeconds}`,
+      cwd: RUNTIME_DIRS.hardboardLogs,
+      exitCode: typeof err.code === 'number' ? err.code : 1,
+      stdout,
+      stderr: err.stderr ?? err.message,
+      logPath,
+    };
+  }
 }
 
 export function createHardboardSnapshot(projectDir: string, label = ''): HardboardSnapshotResult {

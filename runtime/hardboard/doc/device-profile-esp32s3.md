@@ -20,6 +20,7 @@ hardboard.devices_list
 hardboard.idf_set_target(projectDir, "esp32s3")
 hardboard.idf_build(projectDir)
 hardboard.idf_flash(projectDir, "COM3")
+hardboard.serial_capture("COM3", 20)
 ```
 
 烧录结果：
@@ -28,10 +29,12 @@ hardboard.idf_flash(projectDir, "COM3")
 - app `hello_world.bin` 写入并校验通过。
 - partition table 写入并校验通过。
 - 最后通过 RTS hard reset。
+- 串口运行日志应通过 `hardboard.serial_capture` 采集，不依赖交互式 `idf.py monitor`。
 
 ## Agent 开发约束
 
 - 烧录前必须重新调用 `hardboard.devices_list`，不要假定 `COM3` 永远存在。
 - 如果用户没有明确要求烧录，只编译验证即可。
 - 如果用户要求“测试板子/烧录看看/运行到板子上”，必须执行 `hardboard.idf_flash` 并报告真实 exitCode。
+- 如果用户要求验证运行情况，继续执行 `hardboard.serial_capture` 并报告真实串口输出。
 - 工程路径不要包含空格；需要复制时放到 `runtime/hardboard/projects`。

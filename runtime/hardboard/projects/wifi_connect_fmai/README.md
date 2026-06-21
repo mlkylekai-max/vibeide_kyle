@@ -20,4 +20,7 @@ Use hardboard tools:
 hardboard.idf_set_target(projectDir, "esp32s3")
 hardboard.idf_build(projectDir)
 hardboard.idf_flash(projectDir, "COM3")
+hardboard.serial_capture("COM3", 30)
 ```
+
+Expected runtime log includes either `connected to SSID` / `got ip` during boot, or repeated `status connected, ip: ...` lines after the board is running.

@@ -29,8 +29,9 @@
 4. `hardboard.idf_set_target`：新工程或 target 不确定时执行，默认 `esp32s3`。
 5. `hardboard.idf_build`：编译。
 6. `hardboard.idf_flash`：烧录，必须传入真实端口。
-7. `hardboard.idf_clean`：需要清理构建缓存时执行。
-8. `hardboard.idf_erase_flash`：用户明确要求擦除芯片时执行。
+7. `hardboard.serial_capture`：烧录后非交互读取串口日志，验证固件实际运行；SSH/Agent 场景不要依赖 `idf.py monitor`。
+8. `hardboard.idf_clean`：需要清理构建缓存时执行。
+9. `hardboard.idf_erase_flash`：用户明确要求擦除芯片时执行。
 
 ## 工程规则
 
@@ -49,6 +50,7 @@
 - “写好了”只代表文件已创建。
 - “编译通过”必须来自 `hardboard.idf_build` exitCode 0。
 - “烧录成功”必须来自 `hardboard.idf_flash` exitCode 0，并且输出包含写入和校验信息。
+- “运行正常”必须来自 `hardboard.serial_capture` 的串口日志，或用户能看到的等价硬件输出。
 - 不能因为生成了代码或看起来合理就报告硬件验证成功。
 
 ## 已验证基线

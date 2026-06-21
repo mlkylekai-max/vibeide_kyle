@@ -113,6 +113,7 @@
 - `hardboard.idf_set_target(projectDir?, target?)` — 设置 ESP-IDF target
 - `hardboard.idf_build(projectDir?)` — 编译 ESP-IDF 工程
 - `hardboard.idf_flash(projectDir?, port)` — 烧录 ESP-IDF 工程
+- `hardboard.serial_capture(port, durationSeconds?, baudRate?)` — 非交互抓取串口日志，验证固件运行状态
 - `hardboard.idf_clean(projectDir?)` — 清理 ESP-IDF 工程 build 产物
 - `hardboard.idf_erase_flash(projectDir?, port)` — 擦除指定串口设备 Flash
 - `hardboard.snapshot_create(projectDir?, label?)` — 创建本地源码快照，便于回滚

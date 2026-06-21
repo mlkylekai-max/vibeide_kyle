@@ -9,6 +9,7 @@ import {
   runIdfEraseFlash,
   runIdfFlash,
   runIdfSetTarget,
+  runSerialCapture,
 } from '../hardboard.js';
 import { RUNTIME_DIRS } from '../paths.js';
 
@@ -84,6 +85,19 @@ export function registerHardboardTools(server: McpServer) {
     },
   }, async ({ projectDir, port, version }) => {
     const result = await runIdfEraseFlash(projectDir || RUNTIME_DIRS.hardboardProjects, port, version);
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+  });
+
+  server.registerTool('hardboard.serial_capture', {
+    description: '非交互读取串口日志，用于验证 ESP32 程序实际运行状态；适合 SSH/Agent 场景替代 idf.py monitor',
+    inputSchema: {
+      port: z.string().describe('串口端口，例如 COM3、COM8、/dev/ttyUSB0'),
+      durationSeconds: z.number().optional().describe('抓取秒数，默认 20'),
+      baudRate: z.number().optional().describe('串口波特率，默认 115200'),
+      version: z.string().optional().describe('ESP-IDF 版本，默认 5.4.3'),
+    },
+  }, async ({ port, durationSeconds, baudRate, version }) => {
+    const result = await runSerialCapture(port, durationSeconds || 20, baudRate || 115200, version);
     return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
   });
 

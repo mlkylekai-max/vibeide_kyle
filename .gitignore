@@ -9,6 +9,8 @@ runtime/pids/
 runtime/logs/
 runtime/state.json
 runtime/ports.json
+/state.json
+/ports.json
 runtime/recordings/
 runtime/workflows/
 runtime/claude-session/
