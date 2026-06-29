@@ -10,6 +10,29 @@
 - 本轮 Windows 目标目录是 `C:\vibeide`，该目录已有上一版本，迁移时覆盖源码但保留依赖、硬件运行态和本地用户文件。
 - 仓库页新增“导入文件夹”入口，默认精选分组之外允许用户把任意本机目录加入仓库视图；导入分组支持移除，移除后不再允许读写该目录；UI 默认分组不再显示施工文档。
 
+## 2026-06-29 — Windows E:\vibeide 0.1 迁移、打包和 ESP32-S3 测试
+
+- Windows 源码项目已镜像到 `E:\vibeide`。
+- Windows unpacked 包已镜像到 `E:\vibeide-0.1-win-unpacked`。
+- 打包 exe：`E:\vibeide-0.1-win-unpacked\奥德赛0.0.exe`。
+- exe PE 版本已验证为 `FileVersion=0.1.0`、`ProductVersion=0.1.0`。
+- Windows 打包版 runtime 环境验证通过：
+  - `npm --prefix runtime run build`
+  - `npm --prefix electron run typecheck`
+  - `npm --prefix electron run build:main`
+  - `npm --prefix electron run build:renderer`
+  - `npm --prefix electron run pack:win`
+- 打包版 runtime 硬件链路验证：
+  - `hardboard:env` 指向 `E:\vibeide-0.1-win-unpacked\resources\runtime` 和 `%LOCALAPPDATA%\vibeide-hardboard-runtime\hardboard`。
+  - `hardboard:devices` 发现 `COM7`、`COM8`、`COM9`。
+  - `COM7` 经 esptool 确认为 ESP32-S3。
+  - `wifi_connect_fmai` 编译通过、烧录到 `COM7` 通过、hash verified。
+  - `hello_world_esp32s3` 编译通过、烧录到 `COM7` 通过、hash verified。
+- 串口剩余问题：
+  - `hardboard:serial` 可打开 `COM7` / `COM8` 并生成日志，但当前未抓到应用层输出。
+  - `COM9` 打开失败，Windows 返回串口超时。
+  - 已写入详细测试报告：`docs/WINDOWS_0_1_TEST_REPORT.md`。
+
 ## 2026-06-29 — Runtime UI v2 打包、日志与 asar 验证
 
 - 用户反馈 Linux 预览变化明显，但 Windows unpacked exe 观感未变化，判断风险点是继续打开了旧 `win-unpacked` 目录。
