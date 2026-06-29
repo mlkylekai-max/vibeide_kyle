@@ -45,6 +45,7 @@ export interface WorkbenchSection {
   folderPath: string;
   items: WorkbenchItem[];
   emptyText: string;
+  removable?: boolean;
 }
 
 export interface WorkbenchOverview {
@@ -139,6 +140,7 @@ export interface WindowAPI {
   listBrowserTabs: () => Promise<{ tabs: BrowserTab[] }>;
   getWorkbenchOverview: () => Promise<WorkbenchOverview>;
   importWorkbenchFolder: () => Promise<{ ok: boolean; canceled?: boolean; error?: string; overview: WorkbenchOverview }>;
+  removeImportedWorkbenchFolder: (folderPath: string) => Promise<{ ok: boolean; error?: string; overview: WorkbenchOverview }>;
   openWorkbenchItem: (targetPath: string) => Promise<{ ok: boolean; kind?: 'file' | 'dir'; path?: string; url?: string; error?: string }>;
   readWorkbenchFile: (targetPath: string) => Promise<{ ok: boolean; path?: string; text?: string; error?: string }>;
   writeWorkbenchFile: (targetPath: string, text: string) => Promise<{ ok: boolean; path?: string; text?: string; error?: string }>;

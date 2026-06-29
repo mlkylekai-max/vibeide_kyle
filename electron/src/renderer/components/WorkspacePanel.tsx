@@ -5,6 +5,7 @@ interface Props {
   overview: WorkbenchOverview | null;
   onRefresh: () => void;
   onImportFolder: () => void;
+  onRemoveImportedFolder: (folderPath: string) => void;
   onOpenItem: (targetPath: string) => void;
   onEditItem: (item: WorkbenchItem) => void;
 }
@@ -34,7 +35,7 @@ function isEditable(item: WorkbenchItem): boolean {
   return item.kind === 'file' && /(?:CMakeLists\.txt|\.c|\.h|\.cpp|\.hpp|\.S|\.md|\.json|\.txt|\.yaml|\.yml)$/i.test(item.name);
 }
 
-function renderSection(section: WorkbenchSection, onOpenItem: (item: WorkbenchItem) => void) {
+function renderSection(section: WorkbenchSection, onOpenItem: (item: WorkbenchItem) => void, onRemoveImportedFolder: (folderPath: string) => void) {
   return (
     <section key={section.id} className="workspace-section nes-container is-rounded">
       <div className="workspace-section-header">
@@ -42,7 +43,12 @@ function renderSection(section: WorkbenchSection, onOpenItem: (item: WorkbenchIt
           <h3>{section.title}</h3>
           <p>{section.description}</p>
         </div>
-        <code>{section.folderPath}</code>
+        <div className="workspace-section-tools">
+          <code>{section.folderPath}</code>
+          {section.removable ? (
+            <button className="nes-btn is-error" type="button" onClick={() => onRemoveImportedFolder(section.folderPath)}>移除</button>
+          ) : null}
+        </div>
       </div>
       <div className="workspace-items">
         {section.items.length ? section.items.map((item: WorkbenchItem) => (
@@ -73,7 +79,7 @@ function renderSection(section: WorkbenchSection, onOpenItem: (item: WorkbenchIt
   );
 }
 
-export default function WorkspacePanel({ overview, onRefresh, onImportFolder, onOpenItem, onEditItem }: Props) {
+export default function WorkspacePanel({ overview, onRefresh, onImportFolder, onRemoveImportedFolder, onOpenItem, onEditItem }: Props) {
   const handleOpenItem = async (item: WorkbenchItem) => {
     if (window.electronAPI?.isWorkbenchSmokeTest) {
       onOpenItem(item.path);
@@ -101,7 +107,7 @@ export default function WorkspacePanel({ overview, onRefresh, onImportFolder, on
         </div>
       </div>
       <div className="workspace-grid">
-        {overview?.sections.map((section) => renderSection(section, handleOpenItem))}
+        {overview?.sections.map((section) => renderSection(section, handleOpenItem, onRemoveImportedFolder))}
       </div>
     </div>
   );

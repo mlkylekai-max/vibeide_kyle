@@ -20,6 +20,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   listBrowserTabs: () => ipcRenderer.invoke('browser:listTabs'),
   getWorkbenchOverview: () => ipcRenderer.invoke('workbench:getOverview'),
   importWorkbenchFolder: () => ipcRenderer.invoke('workbench:importFolder'),
+  removeImportedWorkbenchFolder: (folderPath: string) => ipcRenderer.invoke('workbench:removeImportedFolder', folderPath),
   openWorkbenchItem: (targetPath: string) => ipcRenderer.invoke('workbench:openItem', targetPath),
   readWorkbenchFile: (targetPath: string) => ipcRenderer.invoke('workbench:readFile', targetPath),
   writeWorkbenchFile: (targetPath: string, text: string) => ipcRenderer.invoke('workbench:writeFile', targetPath, text),

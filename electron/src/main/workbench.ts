@@ -24,6 +24,7 @@ export interface WorkbenchSection {
   folderPath: string;
   items: WorkbenchItem[];
   emptyText: string;
+  removable?: boolean;
 }
 
 export interface WorkbenchOverview {
@@ -164,12 +165,20 @@ export function importWorkbenchFolder(folderPath: string): WorkbenchOverview {
   return getWorkbenchOverview();
 }
 
+export function removeImportedWorkbenchFolder(folderPath: string): WorkbenchOverview {
+  const resolved = path.resolve(folderPath);
+  const next = readImportedFolders().filter((entry) => entry !== resolved);
+  writeImportedFolders(next);
+  return getWorkbenchOverview();
+}
+
 function getImportedSections(): WorkbenchSection[] {
   return readImportedFolders().map((folderPath, index) => ({
     id: `imported-${index}-${Buffer.from(folderPath).toString('hex').slice(0, 10)}`,
     title: `导入: ${path.basename(folderPath) || folderPath}`,
     description: '用户导入的额外文件夹',
     folderPath,
+    removable: true,
     items: listFilesRecursive(folderPath, {
       limit: 32,
       include: /(?:CMakeLists\.txt|README\.md|sdkconfig(?:\.defaults)?|\.html?$|\.svg$|\.c$|\.h$|\.cpp$|\.hpp$|\.S$|\.md$|\.json$|\.txt$|\.yaml$|\.yml$)/i,

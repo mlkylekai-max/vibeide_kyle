@@ -42,7 +42,9 @@ npm --prefix electron run pack:win
 同时新增“导入文件夹”功能：
 
 - 用户可以从本机选择额外文件夹加入仓库视图。
+- 导入文件夹必须能从仓库视图移除，不能只导入不能退出。
 - 导入文件夹持久化到 runtime 数据目录。
+- 移除导入文件夹后，该目录从持久化列表删除，读取和写入权限随之撤销。
 - 导入分组显示常见源码、Markdown、JSON、YAML、TXT、HTML 文件。
 - HTML / SVG 文件点击后在工作台浏览器运行。
 - C / H / CMake / Markdown / skills 文档点击后进入多文件编辑器，可切换、保存、关闭。

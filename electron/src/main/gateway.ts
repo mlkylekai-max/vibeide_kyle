@@ -4,7 +4,7 @@ import { ipcMain, BrowserWindow, dialog } from 'electron';
 import { handleTask, getOrchestrator } from './worker';
 import { activateTab, closeTab, listTabs, openTabUrl, setBrowserTabsEmitter, setBrowserViewBoundsFromRenderer } from './browser-view';
 import { listBrowserRecordingSummaries, listBrowserRecordings, replayBrowserRecording, replayLatestBrowserRecording, startBrowserRecording, stopBrowserRecording } from './browser-recorder';
-import { getWorkbenchOverview, importWorkbenchFolder, openWorkbenchItem, readWorkbenchFile, writeWorkbenchFile } from './workbench';
+import { getWorkbenchOverview, importWorkbenchFolder, openWorkbenchItem, readWorkbenchFile, removeImportedWorkbenchFolder, writeWorkbenchFile } from './workbench';
 import {
   isSerialMonitorRunning,
   listHardboardDevices,
@@ -83,6 +83,15 @@ export function startGateway(mainWindow: BrowserWindow): void {
     }
     try {
       return { ok: true, overview: importWorkbenchFolder(picked.filePaths[0]) };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return { ok: false, error: message, overview: getWorkbenchOverview() };
+    }
+  });
+
+  ipcMain.handle('workbench:removeImportedFolder', async (_event, folderPath: string) => {
+    try {
+      return { ok: true, overview: removeImportedWorkbenchFolder(folderPath) };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       return { ok: false, error: message, overview: getWorkbenchOverview() };

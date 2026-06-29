@@ -201,6 +201,19 @@ export default function App() {
     }]);
   }, []);
 
+  const handleRemoveImportedWorkbenchFolder = useCallback(async (folderPath: string) => {
+    const result = await window.electronAPI?.removeImportedWorkbenchFolder(folderPath);
+    if (!result) return;
+    setWorkbench(result.overview);
+    setMessages(prev => [...prev, {
+      id: crypto.randomUUID(),
+      text: result.ok ? `已移除导入文件夹: ${folderPath}` : `移除导入文件夹失败: ${result.error}`,
+      role: 'agent',
+      timestamp: Date.now(),
+      error: !result.ok,
+    }]);
+  }, []);
+
   const handleOpenWorkbenchItem = useCallback(async (targetPath: string) => {
     const result = await window.electronAPI?.openWorkbenchItem(targetPath);
     if (!result) return;
@@ -276,6 +289,7 @@ export default function App() {
             workbench={workbench}
             onRefreshWorkbench={handleRefreshWorkbench}
             onImportWorkbenchFolder={handleImportWorkbenchFolder}
+            onRemoveImportedWorkbenchFolder={handleRemoveImportedWorkbenchFolder}
             onOpenWorkbenchItem={handleOpenWorkbenchItem}
           />
         </div>

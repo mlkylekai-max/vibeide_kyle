@@ -21,6 +21,7 @@ interface Props {
   workbench: WorkbenchOverview | null;
   onRefreshWorkbench: () => void;
   onImportWorkbenchFolder: () => void;
+  onRemoveImportedWorkbenchFolder: (folderPath: string) => void;
   onOpenWorkbenchItem: (targetPath: string) => void;
 }
 
@@ -123,6 +124,7 @@ export default function BrowserPanel({
   workbench,
   onRefreshWorkbench,
   onImportWorkbenchFolder,
+  onRemoveImportedWorkbenchFolder,
   onOpenWorkbenchItem,
 }: Props) {
   const [mode, setMode] = useState<PanelMode>(() => window.electronAPI?.isWorkbenchSmokeTest ? 'repo' : 'monitor');
@@ -484,7 +486,7 @@ export default function BrowserPanel({
       ) : null}
 
       {mode === 'repo' ? (
-        <WorkspacePanel overview={workbench} onRefresh={onRefreshWorkbench} onImportFolder={onImportWorkbenchFolder} onOpenItem={onOpenWorkbenchItem} onEditItem={handleEditWorkbenchItem} />
+        <WorkspacePanel overview={workbench} onRefresh={onRefreshWorkbench} onImportFolder={onImportWorkbenchFolder} onRemoveImportedFolder={onRemoveImportedWorkbenchFolder} onOpenItem={onOpenWorkbenchItem} onEditItem={handleEditWorkbenchItem} />
       ) : null}
 
       {mode === 'monitor' ? (

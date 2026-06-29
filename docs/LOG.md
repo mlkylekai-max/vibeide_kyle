@@ -2,6 +2,14 @@
 
 > 当前日志只保留对现代码仍然成立的记录。
 
+## 2026-06-29 — Windows C:\vibeide 0.1 迁移启动
+
+- 按用户要求先写施工文档：`docs/WINDOWS_0_1_MIGRATION_CONSTRUCTION.md`。
+- 已将当前施工成果备份到 `git@github.com:howtion0/vibeide.git`，`main` 更新到本轮 runtime task manager / 仓库导入文件夹 / Windows 迁移施工方案。
+- Electron 应用版本调整为 `0.1.0`，后续 Windows unpacked exe 需要写入 `FileVersion=0.1.0`、`ProductVersion=0.1.0`。
+- 本轮 Windows 目标目录是 `C:\vibeide`，该目录已有上一版本，迁移时覆盖源码但保留依赖、硬件运行态和本地用户文件。
+- 仓库页新增“导入文件夹”入口，默认精选分组之外允许用户把任意本机目录加入仓库视图；导入分组支持移除，移除后不再允许读写该目录。
+
 ## 2026-06-29 — Runtime UI v2 打包、日志与 asar 验证
 
 - 用户反馈 Linux 预览变化明显，但 Windows unpacked exe 观感未变化，判断风险点是继续打开了旧 `win-unpacked` 目录。
