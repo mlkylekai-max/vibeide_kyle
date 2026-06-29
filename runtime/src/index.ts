@@ -27,6 +27,7 @@ export {
   runIdfSetTarget,
   runSerialCapture,
 } from './hardboard.js';
+export { readRuntimeEventsSince } from './eventbus/index.js';
 
 async function runCli(): Promise<void> {
   const command = process.argv[2] ?? 'health';
@@ -70,6 +71,13 @@ async function runCli(): Promise<void> {
     return;
   }
 
+  if (command === 'hardboard:events') {
+    const { readRuntimeEventsSince } = await import('./eventbus/index.js');
+    const sinceSeq = Number.parseInt(process.argv[3] || '0', 10);
+    console.log(JSON.stringify(readRuntimeEventsSince(Number.isFinite(sinceSeq) ? sinceSeq : 0), null, 2));
+    return;
+  }
+
   if (command === 'hardboard:snapshot') {
     const { createHardboardSnapshot } = await import('./hardboard.js');
     console.log(JSON.stringify(createHardboardSnapshot(process.argv[3] || RUNTIME_DIRS.hardboardProjects, process.argv[4] || ''), null, 2));
@@ -78,7 +86,7 @@ async function runCli(): Promise<void> {
 
   if (command === 'hardboard:build') {
     const { runIdfBuild } = await import('./hardboard.js');
-    const result = await runIdfBuild(process.argv[3] || RUNTIME_DIRS.hardboardProjects, process.argv[4]);
+    const result = await runIdfBuild(process.argv[3] || RUNTIME_DIRS.hardboardProjects, process.argv[4], 'manual');
     console.log(JSON.stringify(compactCommandResult(result), null, 2));
     process.exitCode = result.exitCode;
     return;
@@ -86,7 +94,7 @@ async function runCli(): Promise<void> {
 
   if (command === 'hardboard:flash') {
     const { runIdfFlash } = await import('./hardboard.js');
-    const result = await runIdfFlash(process.argv[3] || RUNTIME_DIRS.hardboardProjects, process.argv[4] || '', process.argv[5]);
+    const result = await runIdfFlash(process.argv[3] || RUNTIME_DIRS.hardboardProjects, process.argv[4] || '', process.argv[5], 'manual');
     console.log(JSON.stringify(compactCommandResult(result), null, 2));
     process.exitCode = result.exitCode;
     return;
@@ -99,6 +107,7 @@ async function runCli(): Promise<void> {
       Number.parseInt(process.argv[4] || '20', 10),
       Number.parseInt(process.argv[5] || '115200', 10),
       process.argv[6],
+      'manual',
     );
     console.log(JSON.stringify(result, null, 2));
     process.exitCode = result.exitCode;

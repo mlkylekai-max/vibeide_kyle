@@ -70,6 +70,7 @@ export const RUNTIME_DIRS = {
   hardboardProjects: path.join(HARDBOARD_ROOT, 'projects'),
   hardboardSnapshots: path.join(HARDBOARD_ROOT, 'git-snapshots'),
   hardboardLogs: path.join(HARDBOARD_ROOT, 'logs'),
+  hardboardEvents: path.join(HARDBOARD_ROOT, 'events'),
   hardboardFirmware: path.join(HARDBOARD_ROOT, 'firmware'),
 };
 

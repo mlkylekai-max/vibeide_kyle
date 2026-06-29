@@ -35,6 +35,7 @@ export interface WorkbenchItem {
   detail?: string;
   actionCount?: number | null;
   sourceUrl?: string;
+  category?: 'skill' | 'agent' | 'hardware' | 'reference' | 'doc' | 'imported';
 }
 
 export interface WorkbenchSection {
@@ -70,6 +71,60 @@ export interface HardboardDevice {
   source: string;
 }
 
+export interface HardboardSourceFile {
+  path: string;
+  name: string;
+  relativePath: string;
+  kind: 'source' | 'cmake' | 'config' | 'dir' | 'other';
+  size: number | null;
+  updatedAt: number | null;
+}
+
+export interface RuntimeEvent {
+  seq: number;
+  id: string;
+  time: number;
+  source: string;
+  kind: string;
+  taskId?: string;
+  pid?: number;
+  toolName?: string;
+  projectDir?: string;
+  message?: string;
+  payload?: Record<string, unknown>;
+}
+
+export interface HardboardRuntimeState {
+  generatedAt: number;
+  lastSeq: number;
+  lastHeartbeatAt: number | null;
+  activeTaskId: string | null;
+  activeToolName: string | null;
+  activeProjectDir: string | null;
+  activePid: number | null;
+  phase: 'idle' | 'build' | 'flash' | 'serial' | 'tool' | 'stale';
+  status: 'idle' | 'running' | 'completed' | 'failed' | 'stale';
+  progress: number | null;
+  currentFile: string | null;
+  currentPort: string | null;
+  files: HardboardSourceFile[];
+  recent: RuntimeEvent[];
+  lastError: string | null;
+}
+
+export interface HardboardRuntimeEventsResult {
+  state: HardboardRuntimeState;
+  events: RuntimeEvent[];
+}
+
+export interface HardboardRuntimeLaunchResult {
+  ok: boolean;
+  pid?: number;
+  command?: string;
+  args?: string[];
+  error?: string;
+}
+
 export interface WindowAPI {
   sendMessage: (text: string) => Promise<{ ok: boolean }>;
   onMessage: (cb: (msg: { text: string; timestamp: number; error?: boolean }) => void) => void;
@@ -83,7 +138,10 @@ export interface WindowAPI {
   setBrowserBounds: (bounds: { x: number; y: number; width: number; height: number }) => Promise<{ ok: boolean }>;
   listBrowserTabs: () => Promise<{ tabs: BrowserTab[] }>;
   getWorkbenchOverview: () => Promise<WorkbenchOverview>;
+  importWorkbenchFolder: () => Promise<{ ok: boolean; canceled?: boolean; error?: string; overview: WorkbenchOverview }>;
   openWorkbenchItem: (targetPath: string) => Promise<{ ok: boolean; kind?: 'file' | 'dir'; path?: string; url?: string; error?: string }>;
+  readWorkbenchFile: (targetPath: string) => Promise<{ ok: boolean; path?: string; text?: string; error?: string }>;
+  writeWorkbenchFile: (targetPath: string, text: string) => Promise<{ ok: boolean; path?: string; text?: string; error?: string }>;
   isWorkbenchSmokeTest?: boolean;
   finishWorkbenchSmokeTest?: (result: unknown) => Promise<{ ok: boolean }>;
   activateBrowserTab: (id: string) => Promise<{ ok: boolean }>;
@@ -95,6 +153,10 @@ export interface WindowAPI {
   listBrowserRecordings: () => Promise<{ files: string[] }>;
   listBrowserRecordingSummaries: () => Promise<{ recordings: RecordingSummary[] }>;
   listHardboardDevices: () => Promise<{ devices: HardboardDevice[] }>;
+  getHardboardRuntimeEvents: (sinceSeq?: number) => Promise<HardboardRuntimeEventsResult>;
+  startHardboardBuild: (options?: { projectDir?: string; cmakeFile?: string; configFile?: string; sourceFile?: string }) => Promise<HardboardRuntimeLaunchResult>;
+  startHardboardFlash: (options: { projectDir?: string; port: string; artifactFile?: string; configFile?: string }) => Promise<HardboardRuntimeLaunchResult>;
+  readHardboardSourceFile: (targetPath: string) => Promise<{ ok: boolean; path?: string; text?: string; error?: string }>;
   startSerialMonitor: (options: { port: string; baudRate: number; encoding: string }) => Promise<{ ok: boolean; running: boolean; error?: string }>;
   stopSerialMonitor: () => Promise<{ ok: boolean; running: boolean }>;
   getSerialMonitorStatus: () => Promise<{ running: boolean }>;

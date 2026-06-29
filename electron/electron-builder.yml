@@ -44,6 +44,7 @@ extraResources:
       - "!**/.cache/**"
       - "!esptools/esp-idf-v*/esp-idf/examples/**"
       - "!logs/**"
+      - "!events/**"
   - from: ../scripts
     to: scripts
     filter:

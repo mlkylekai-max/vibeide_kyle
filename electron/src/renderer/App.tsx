@@ -188,6 +188,19 @@ export default function App() {
     await refreshWorkbench();
   }, [refreshWorkbench]);
 
+  const handleImportWorkbenchFolder = useCallback(async () => {
+    const result = await window.electronAPI?.importWorkbenchFolder();
+    if (!result || result.canceled) return;
+    setWorkbench(result.overview);
+    setMessages(prev => [...prev, {
+      id: crypto.randomUUID(),
+      text: result.ok ? '已导入文件夹到仓库视图。' : `导入文件夹失败: ${result.error}`,
+      role: 'agent',
+      timestamp: Date.now(),
+      error: !result.ok,
+    }]);
+  }, []);
+
   const handleOpenWorkbenchItem = useCallback(async (targetPath: string) => {
     const result = await window.electronAPI?.openWorkbenchItem(targetPath);
     if (!result) return;
@@ -262,6 +275,7 @@ export default function App() {
             onHardboardFlash={handleHardboardFlash}
             workbench={workbench}
             onRefreshWorkbench={handleRefreshWorkbench}
+            onImportWorkbenchFolder={handleImportWorkbenchFolder}
             onOpenWorkbenchItem={handleOpenWorkbenchItem}
           />
         </div>

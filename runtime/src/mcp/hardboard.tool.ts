@@ -12,6 +12,7 @@ import {
   runIdfSetTarget,
   runSerialCapture,
 } from '../hardboard.js';
+import { publishRuntimeEvent } from '../eventbus/index.js';
 import { RUNTIME_DIRS } from '../paths.js';
 
 const OUTPUT_TAIL_CHARS = 6000;
@@ -23,14 +24,18 @@ export function registerHardboardTools(server: McpServer) {
       version: z.string().optional().describe('ESP-IDF 版本，默认 5.4'),
     },
   }, async ({ version }) => {
-    return { content: [{ type: 'text', text: JSON.stringify(getHardboardEnvStatus(version), null, 2) }] };
+    return withToolEvent('hardboard.env_status', async () => {
+      return { content: [{ type: 'text', text: JSON.stringify(getHardboardEnvStatus(version), null, 2) }] };
+    });
   });
 
   server.registerTool('hardboard.devices_list', {
     description: '列出当前连接的串口设备，用于选择 ESP32/ESP32-S3 烧录端口',
   }, async () => {
-    const devices = await listHardboardDevices();
-    return { content: [{ type: 'text', text: devices.length ? JSON.stringify(devices, null, 2) : '(未发现串口设备)' }] };
+    return withToolEvent('hardboard.devices_list', async () => {
+      const devices = await listHardboardDevices();
+      return { content: [{ type: 'text', text: devices.length ? JSON.stringify(devices, null, 2) : '(未发现串口设备)' }] };
+    });
   });
 
   server.registerTool('hardboard.idf_build', {
@@ -111,9 +116,46 @@ export function registerHardboardTools(server: McpServer) {
       label: z.string().optional().describe('快照标签，例如 before-led-change'),
     },
   }, async ({ projectDir, label }) => {
-    const result = createHardboardSnapshot(projectDir || RUNTIME_DIRS.hardboardProjects, label || '');
-    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+    return withToolEvent('hardboard.snapshot_create', async () => {
+      const result = createHardboardSnapshot(projectDir || RUNTIME_DIRS.hardboardProjects, label || '');
+      return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+    }, projectDir || RUNTIME_DIRS.hardboardProjects);
   });
+}
+
+async function withToolEvent<T>(toolName: string, fn: () => Promise<T>, projectDir?: string): Promise<T> {
+  const taskId = `mcp-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  publishRuntimeEvent({
+    source: 'mcp',
+    kind: 'tool.started',
+    taskId,
+    toolName,
+    projectDir,
+  });
+  try {
+    const result = await fn();
+    publishRuntimeEvent({
+      source: 'mcp',
+      kind: 'tool.completed',
+      taskId,
+      toolName,
+      projectDir,
+      payload: { exitCode: 0, ok: true },
+    });
+    return result;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    publishRuntimeEvent({
+      source: 'mcp',
+      kind: 'tool.failed',
+      taskId,
+      toolName,
+      projectDir,
+      message,
+      payload: { exitCode: 1, ok: false },
+    });
+    throw error;
+  }
 }
 
 function compactCommandResult(result: HardboardCommandResult) {

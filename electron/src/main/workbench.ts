@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { getAppRoot, getRecordingsDir, getWorkflowsDir, getAgentWorkspaceDir, getHardboardDir } from './paths';
+import { getAppRoot, getRecordingsDir, getWorkflowsDir, getAgentWorkspaceDir, getHardboardDir, getRuntimeDataDir } from './paths';
 
 export interface WorkbenchItem {
   name: string;
@@ -14,6 +14,7 @@ export interface WorkbenchItem {
   detail?: string;
   actionCount?: number | null;
   sourceUrl?: string;
+  category?: 'skill' | 'agent' | 'hardware' | 'reference' | 'doc' | 'imported';
 }
 
 export interface WorkbenchSection {
@@ -36,7 +37,15 @@ export interface WorkbenchOpenResult {
   url: string;
 }
 
+export interface WorkbenchFileResult {
+  ok: boolean;
+  path?: string;
+  text?: string;
+  error?: string;
+}
+
 const PROJECT_ROOT = getAppRoot();
+const IMPORTED_FOLDERS_FILE = getRuntimeDataDir('workbench-imports.json');
 
 function allowedWorkbenchRoots(): string[] {
   return [
@@ -46,6 +55,10 @@ function allowedWorkbenchRoots(): string[] {
     getWorkflowsDir(),
     path.join(PROJECT_ROOT, 'agent', 'tools'),
     getHardboardDir(),
+    path.join(PROJECT_ROOT, 'docs'),
+    path.join(PROJECT_ROOT, 'runtime', 'hardboard'),
+    path.join(PROJECT_ROOT, 'agent', 'skills'),
+    ...readImportedFolders(),
   ].map((entry) => path.resolve(entry));
 }
 
@@ -87,6 +100,83 @@ function listDirectory(folderPath: string, options?: { limit?: number; includeHi
   } catch {
     return [];
   }
+}
+
+function listFilesRecursive(folderPath: string, options?: {
+  limit?: number;
+  include?: RegExp;
+  excludeDirs?: Set<string>;
+  category?: WorkbenchItem['category'];
+}): WorkbenchItem[] {
+  const results: WorkbenchItem[] = [];
+  const excludeDirs = options?.excludeDirs ?? new Set(['.git', 'node_modules', 'build', 'managed_components', 'dist', 'dist-package']);
+  const visit = (dir: string, depth: number) => {
+    if (results.length >= (options?.limit ?? 24) || depth > 5 || !fs.existsSync(dir)) return;
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (entry.name.startsWith('.') || excludeDirs.has(entry.name)) continue;
+      const fullPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        visit(fullPath, depth + 1);
+        continue;
+      }
+      if (!entry.isFile()) continue;
+      if (options?.include && !options.include.test(entry.name) && !options.include.test(fullPath)) continue;
+      const item = statItem(fullPath, (base) => ({
+        ...base,
+        category: options?.category,
+        detail: path.relative(folderPath, fullPath).replace(/\\/g, '/'),
+      }));
+      if (item) results.push(item);
+      if (results.length >= (options?.limit ?? 24)) return;
+    }
+  };
+  visit(folderPath, 0);
+  return results.sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'));
+}
+
+function readImportedFolders(): string[] {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(IMPORTED_FOLDERS_FILE, 'utf-8')) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((entry): entry is string => typeof entry === 'string')
+      .map((entry) => path.resolve(entry))
+      .filter((entry, index, all) => fs.existsSync(entry) && fs.statSync(entry).isDirectory() && all.indexOf(entry) === index);
+  } catch {
+    return [];
+  }
+}
+
+function writeImportedFolders(folders: string[]): void {
+  fs.mkdirSync(path.dirname(IMPORTED_FOLDERS_FILE), { recursive: true });
+  fs.writeFileSync(IMPORTED_FOLDERS_FILE, JSON.stringify(folders, null, 2), 'utf-8');
+}
+
+export function importWorkbenchFolder(folderPath: string): WorkbenchOverview {
+  const resolved = path.resolve(folderPath);
+  if (!fs.existsSync(resolved) || !fs.statSync(resolved).isDirectory()) {
+    throw new Error(`导入路径不是文件夹: ${resolved}`);
+  }
+  const current = readImportedFolders();
+  if (!current.includes(resolved)) {
+    writeImportedFolders([...current, resolved]);
+  }
+  return getWorkbenchOverview();
+}
+
+function getImportedSections(): WorkbenchSection[] {
+  return readImportedFolders().map((folderPath, index) => ({
+    id: `imported-${index}-${Buffer.from(folderPath).toString('hex').slice(0, 10)}`,
+    title: `导入: ${path.basename(folderPath) || folderPath}`,
+    description: '用户导入的额外文件夹',
+    folderPath,
+    items: listFilesRecursive(folderPath, {
+      limit: 32,
+      include: /(?:CMakeLists\.txt|README\.md|sdkconfig(?:\.defaults)?|\.html?$|\.svg$|\.c$|\.h$|\.cpp$|\.hpp$|\.S$|\.md$|\.json$|\.txt$|\.yaml$|\.yml$)/i,
+      category: 'imported',
+    }),
+    emptyText: '导入文件夹里没有可显示文件',
+  }));
 }
 
 function enrichRecording(item: WorkbenchItem): WorkbenchItem {
@@ -141,81 +231,77 @@ function enrichWorkflow(item: WorkbenchItem): WorkbenchItem {
   }
 }
 
-function buildRootItems(): WorkbenchItem[] {
-  const names = ['README.md', 'CLAUDE.md', 'docs', 'config', 'scripts', 'electron', 'runtime', 'agent'];
-  return names
-    .map((name) => statItem(path.join(PROJECT_ROOT, name)))
-    .filter((entry): entry is WorkbenchItem => Boolean(entry));
-}
-
 export function getWorkbenchOverview(): WorkbenchOverview {
   return {
     generatedAt: Date.now(),
     sections: [
       {
-        id: 'files',
-        title: '文件',
-        description: '项目主目录与核心资料入口',
-        folderPath: PROJECT_ROOT,
-        items: buildRootItems(),
-        emptyText: '项目入口文件暂时为空',
-      },
-      {
-        id: 'tools',
-        title: '生成',
-        description: 'Agent 生成的代码和临时文件',
+        id: 'agent-generated',
+        title: 'Agent 生成',
+        description: 'Agent 生成的文件与临时工程产物',
         folderPath: getAgentWorkspaceDir(),
-        items: listDirectory(getAgentWorkspaceDir(), { limit: 24 }),
+        items: listDirectory(getAgentWorkspaceDir(), {
+          limit: 12,
+          enrich: (item) => ({ ...item, category: 'agent' }),
+        }),
         emptyText: '还没有生成文件',
       },
       {
-        id: 'hardboard-doc',
-        title: '硬件文档',
-        description: '施工文档、设备资料和 ESP-IDF 调用规则',
-        folderPath: getHardboardDir('doc'),
-        items: listDirectory(getHardboardDir('doc'), { limit: 24 }),
-        emptyText: '还没有硬件文档',
-      },
-      {
-        id: 'hardboard-examples',
-        title: '硬件示例',
-        description: 'ESP32-S3 / ESP-IDF 示例工程',
-        folderPath: getHardboardDir('example'),
-        items: listDirectory(getHardboardDir('example'), { limit: 24 }),
-        emptyText: '还没有示例工程',
-      },
-      {
-        id: 'hardboard-projects',
+        id: 'hardware-files',
         title: '硬件工程',
-        description: 'Agent 可编译和烧录的本地 ESP-IDF 工程',
+        description: '可编译/烧录工程里的 C、CMake、配置和头文件',
         folderPath: getHardboardDir('projects'),
-        items: listDirectory(getHardboardDir('projects'), { limit: 24 }),
-        emptyText: '还没有硬件工程',
+        items: listFilesRecursive(getHardboardDir('projects'), {
+          limit: 24,
+          include: /(?:CMakeLists\.txt|sdkconfig(?:\.defaults)?|\.c$|\.h$|\.cpp$|\.hpp$|\.S$)/i,
+          category: 'hardware',
+        }),
+        emptyText: '还没有硬件工程文件',
       },
       {
-        id: 'agent-tools',
-        title: '工具',
-        description: 'Agent 可执行脚本与辅助工具',
-        folderPath: path.join(PROJECT_ROOT, 'agent', 'tools'),
-        items: listDirectory(path.join(PROJECT_ROOT, 'agent', 'tools')),
-        emptyText: '工具目录暂时为空',
+        id: 'reference-code',
+        title: '参考代码',
+        description: 'ESP-IDF 参考示例与可复用片段',
+        folderPath: getHardboardDir('example'),
+        items: listFilesRecursive(getHardboardDir('example'), {
+          limit: 16,
+          include: /(?:CMakeLists\.txt|README\.md|\.c$|\.h$|\.cpp$|\.hpp$|\.md$)/i,
+          category: 'reference',
+        }),
+        emptyText: '还没有参考代码',
       },
       {
-        id: 'recordings',
-        title: '录制',
-        description: '当前保存的浏览器录制文件',
-        folderPath: getRecordingsDir(),
-        items: listDirectory(getRecordingsDir(), { limit: 24, enrich: enrichRecording }),
-        emptyText: '还没有录制文件',
+        id: 'construction-docs',
+        title: '施工文档',
+        description: 'runtime、hardboard 和 UI 施工记录',
+        folderPath: path.join(PROJECT_ROOT, 'docs'),
+        items: [
+          ...listFilesRecursive(path.join(PROJECT_ROOT, 'docs'), {
+            limit: 16,
+            include: /\.md$/i,
+            category: 'doc',
+          }),
+          ...listFilesRecursive(getHardboardDir('doc'), {
+            limit: 8,
+            include: /\.md$/i,
+            category: 'doc',
+          }),
+        ].slice(0, 20),
+        emptyText: '还没有施工文档',
       },
       {
-        id: 'replays',
-        title: '重放',
-        description: '可直接复用的回放/工作流定义',
-        folderPath: getWorkflowsDir(),
-        items: listDirectory(getWorkflowsDir(), { limit: 24, enrich: enrichWorkflow }),
-        emptyText: '还没有工作流文件',
+        id: 'skills',
+        title: 'Skills',
+        description: 'Agent skills、工具说明和可编辑 Markdown',
+        folderPath: path.join(PROJECT_ROOT, 'agent', 'skills'),
+        items: listFilesRecursive(path.join(PROJECT_ROOT, 'agent', 'skills'), {
+          limit: 16,
+          include: /\.(md|json|txt)$/i,
+          category: 'skill',
+        }),
+        emptyText: '还没有 skills 文件',
       },
+      ...getImportedSections(),
     ],
   };
 }
@@ -236,4 +322,30 @@ export function openWorkbenchItem(targetPath: string): WorkbenchOpenResult {
     path: resolved,
     url: pathToFileURL(resolved).toString(),
   };
+}
+
+export function readWorkbenchFile(targetPath: string): WorkbenchFileResult {
+  try {
+    if (!isAllowedWorkbenchPath(targetPath)) return { ok: false, error: '不允许读取工作台范围外的路径' };
+    const resolved = path.resolve(targetPath);
+    const stats = fs.statSync(resolved);
+    if (!stats.isFile()) return { ok: false, error: '只能读取文件' };
+    if (stats.size > 512 * 1024) return { ok: false, error: '文件超过 512KB，暂不在工作台预览' };
+    return { ok: true, path: resolved, text: fs.readFileSync(resolved, 'utf-8') };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+export function writeWorkbenchFile(targetPath: string, text: string): WorkbenchFileResult {
+  try {
+    if (!isAllowedWorkbenchPath(targetPath)) return { ok: false, error: '不允许写入工作台范围外的路径' };
+    const resolved = path.resolve(targetPath);
+    const stats = fs.statSync(resolved);
+    if (!stats.isFile()) return { ok: false, error: '只能写入文件' };
+    fs.writeFileSync(resolved, text, 'utf-8');
+    return { ok: true, path: resolved, text };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : String(error) };
+  }
 }

@@ -3,6 +3,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { registerBrowserTools } from './browser.tool.js';
 import { registerStorageTools } from './storage.tool.js';
 import { registerHardboardTools } from './hardboard.tool.js';
+import { instrumentMcpToolEvents } from './tool-events.js';
 
 export async function startMCPServer() {
   const server = new McpServer(
@@ -13,6 +14,7 @@ export async function startMCPServer() {
     }
   );
 
+  instrumentMcpToolEvents(server);
   registerBrowserTools(server);
   registerStorageTools(server);
   registerHardboardTools(server);
