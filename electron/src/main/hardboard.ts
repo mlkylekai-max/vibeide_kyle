@@ -24,6 +24,28 @@ export interface SerialMonitorChunk {
   timestamp: number;
 }
 
+export interface HardboardRuntimeLaunchResult {
+  ok: boolean;
+  pid?: number;
+  command?: string;
+  args?: string[];
+  error?: string;
+}
+
+export interface HardboardBuildLaunchOptions {
+  projectDir?: string;
+  cmakeFile?: string;
+  configFile?: string;
+  sourceFile?: string;
+}
+
+export interface HardboardFlashLaunchOptions {
+  projectDir?: string;
+  port: string;
+  artifactFile?: string;
+  configFile?: string;
+}
+
 let serialProcess: ChildProcessWithoutNullStreams | null = null;
 let serialStopTimer: NodeJS.Timeout | null = null;
 
@@ -119,6 +141,170 @@ export function stopSerialMonitor(): { ok: boolean } {
     if (!child.killed) child.kill('SIGKILL');
   }, 1500);
   return { ok: true };
+}
+
+export async function readHardboardRuntimeEvents(sinceSeq = 0): Promise<unknown> {
+  const result = await execRuntimeJson(['hardboard:events', String(Math.max(0, sinceSeq))]);
+  return result;
+}
+
+export function startHardboardBuild(options?: HardboardBuildLaunchOptions): HardboardRuntimeLaunchResult {
+  const projectDir = resolveSelectedProjectDir(options?.projectDir, [
+    options?.cmakeFile,
+    options?.configFile,
+    options?.sourceFile,
+  ]);
+  return spawnRuntimeCommand(['hardboard:build', projectDir], { ...options, projectDir });
+}
+
+export function startHardboardFlash(options: HardboardFlashLaunchOptions): HardboardRuntimeLaunchResult {
+  if (!options.port.trim()) return { ok: false, error: '缺少串口端口' };
+  const projectDir = resolveSelectedProjectDir(options.projectDir, [
+    options.configFile,
+    options.artifactFile,
+  ]);
+  return spawnRuntimeCommand(['hardboard:flash', projectDir, options.port.trim()], { ...options, projectDir });
+}
+
+export function readHardboardSourceFile(targetPath: string): { ok: boolean; path?: string; text?: string; error?: string } {
+  const resolved = path.resolve(targetPath);
+  const allowedRoots = [
+    path.resolve(getHardboardDir('projects')),
+    path.resolve(getHardboardDir('example')),
+  ];
+  if (!allowedRoots.some((root) => resolved === root || resolved.startsWith(`${root}${path.sep}`))) {
+    return { ok: false, error: '只能预览 hardboard projects/examples 内的文件' };
+  }
+  if (!fs.existsSync(resolved) || !fs.statSync(resolved).isFile()) {
+    return { ok: false, error: `文件不存在: ${resolved}` };
+  }
+  const maxBytes = 160 * 1024;
+  const buffer = fs.readFileSync(resolved);
+  return {
+    ok: true,
+    path: resolved,
+    text: buffer.subarray(0, maxBytes).toString('utf-8'),
+  };
+}
+
+function resolveSelectedProjectDir(explicitProjectDir: string | undefined, selectedPaths: Array<string | undefined>): string {
+  const explicit = explicitProjectDir?.trim();
+  if (explicit) return path.resolve(explicit);
+
+  for (const selectedPath of selectedPaths) {
+    if (!selectedPath) continue;
+    const inferred = inferIdfProjectDir(selectedPath);
+    if (inferred) return inferred;
+  }
+
+  return getHardboardDir('projects');
+}
+
+function inferIdfProjectDir(selectedPath: string): string | null {
+  let current = path.resolve(selectedPath);
+  try {
+    if (fs.existsSync(current) && fs.statSync(current).isFile()) {
+      current = path.dirname(current);
+    }
+  } catch {
+    current = path.dirname(current);
+  }
+
+  const roots = [
+    path.resolve(getHardboardDir('projects')),
+    path.resolve(getHardboardDir('example')),
+  ];
+
+  while (roots.some((root) => current === root || current.startsWith(`${root}${path.sep}`))) {
+    if (fs.existsSync(path.join(current, 'CMakeLists.txt'))) {
+      const parent = path.dirname(current);
+      if (path.basename(current).toLowerCase() === 'main' && fs.existsSync(path.join(parent, 'CMakeLists.txt'))) {
+        return parent;
+      }
+      return current;
+    }
+    const parent = path.dirname(current);
+    if (parent === current) break;
+    current = parent;
+  }
+
+  return null;
+}
+
+function spawnRuntimeCommand(args: string[], launchOptions?: object): HardboardRuntimeLaunchResult {
+  const entry = getRuntimeEntry();
+  if (!fs.existsSync(entry)) {
+    return { ok: false, error: `Runtime 未编译: ${entry}` };
+  }
+
+  const node = resolveRuntimeNode();
+  const child = spawn(node, [entry, ...args], {
+    cwd: getRuntimeDir(),
+    env: {
+      ...process.env,
+      VIBEIDE_HARDBOARD_LAUNCH_OPTIONS: launchOptions ? JSON.stringify(launchOptions) : '',
+    },
+    windowsHide: true,
+    stdio: 'ignore',
+  });
+  child.unref();
+  return {
+    ok: true,
+    pid: child.pid,
+    command: node,
+    args: [entry, ...args],
+  };
+}
+
+async function execRuntimeJson(args: string[]): Promise<unknown> {
+  const entry = getRuntimeEntry();
+  if (!fs.existsSync(entry)) {
+    return {
+      state: {
+        generatedAt: Date.now(),
+        lastSeq: 0,
+        lastHeartbeatAt: null,
+        activeTaskId: null,
+        activeToolName: null,
+        activeProjectDir: null,
+        activePid: null,
+        phase: 'idle',
+        status: 'failed',
+        progress: null,
+        currentFile: null,
+        currentPort: null,
+        files: [],
+        recent: [],
+        lastError: `Runtime 未编译: ${entry}`,
+      },
+      events: [],
+    };
+  }
+
+  const { stdout } = await execFileAsync(resolveRuntimeNode(), [entry, ...args], {
+    cwd: getRuntimeDir(),
+    timeout: 8000,
+    windowsHide: true,
+    maxBuffer: 1024 * 1024 * 2,
+  });
+  return JSON.parse(stdout) as unknown;
+}
+
+function getRuntimeEntry(): string {
+  return path.join(getRuntimeDir(), 'dist', 'index.js');
+}
+
+function resolveRuntimeNode(): string {
+  const runtimeDir = getRuntimeDir();
+  const candidates = [
+    path.join(runtimeDir, 'nodejs', process.platform === 'win32' ? 'node.exe' : 'bin/node'),
+    process.platform === 'win32' ? 'node.exe' : 'node',
+  ];
+  for (const candidate of candidates) {
+    if (candidate.includes(path.sep) && !fs.existsSync(candidate)) continue;
+    return candidate;
+  }
+  return process.execPath;
 }
 
 function parseWindowsSerialPorts(stdout: string): HardboardDevice[] {

@@ -1,11 +1,20 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { ipcMain, BrowserWindow } from 'electron';
+import { ipcMain, BrowserWindow, dialog } from 'electron';
 import { handleTask, getOrchestrator } from './worker';
 import { activateTab, closeTab, listTabs, openTabUrl, setBrowserTabsEmitter, setBrowserViewBoundsFromRenderer } from './browser-view';
 import { listBrowserRecordingSummaries, listBrowserRecordings, replayBrowserRecording, replayLatestBrowserRecording, startBrowserRecording, stopBrowserRecording } from './browser-recorder';
-import { getWorkbenchOverview, openWorkbenchItem } from './workbench';
-import { isSerialMonitorRunning, listHardboardDevices, startSerialMonitor, stopSerialMonitor } from './hardboard';
+import { getWorkbenchOverview, importWorkbenchFolder, openWorkbenchItem, readWorkbenchFile, removeImportedWorkbenchFolder, writeWorkbenchFile } from './workbench';
+import {
+  isSerialMonitorRunning,
+  listHardboardDevices,
+  readHardboardRuntimeEvents,
+  readHardboardSourceFile,
+  startHardboardBuild,
+  startHardboardFlash,
+  startSerialMonitor,
+  stopSerialMonitor,
+} from './hardboard';
 
 export function startGateway(mainWindow: BrowserWindow): void {
   // Gateway 提供 pushUI 能力 — Worker 通过它推消息到 UI
@@ -64,6 +73,31 @@ export function startGateway(mainWindow: BrowserWindow): void {
     return getWorkbenchOverview();
   });
 
+  ipcMain.handle('workbench:importFolder', async () => {
+    const picked = await dialog.showOpenDialog(mainWindow, {
+      title: '导入文件夹到仓库',
+      properties: ['openDirectory'],
+    });
+    if (picked.canceled || !picked.filePaths[0]) {
+      return { ok: false, canceled: true, overview: getWorkbenchOverview() };
+    }
+    try {
+      return { ok: true, overview: importWorkbenchFolder(picked.filePaths[0]) };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return { ok: false, error: message, overview: getWorkbenchOverview() };
+    }
+  });
+
+  ipcMain.handle('workbench:removeImportedFolder', async (_event, folderPath: string) => {
+    try {
+      return { ok: true, overview: removeImportedWorkbenchFolder(folderPath) };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return { ok: false, error: message, overview: getWorkbenchOverview() };
+    }
+  });
+
   ipcMain.handle('workbench:openItem', async (_event, targetPath: string) => {
     try {
       const result = openWorkbenchItem(targetPath);
@@ -73,6 +107,14 @@ export function startGateway(mainWindow: BrowserWindow): void {
       const message = error instanceof Error ? error.message : String(error);
       return { ok: false, error: message };
     }
+  });
+
+  ipcMain.handle('workbench:readFile', async (_event, targetPath: string) => {
+    return readWorkbenchFile(targetPath);
+  });
+
+  ipcMain.handle('workbench:writeFile', async (_event, targetPath: string, text: string) => {
+    return writeWorkbenchFile(targetPath, text);
   });
 
   ipcMain.handle('smoke:workbench:finish', async (_event, result: unknown) => {
@@ -137,6 +179,22 @@ export function startGateway(mainWindow: BrowserWindow): void {
 
   ipcMain.handle('hardboard:listDevices', async () => {
     return { devices: await listHardboardDevices() };
+  });
+
+  ipcMain.handle('hardboard:runtimeEvents', async (_event, sinceSeq?: number) => {
+    return readHardboardRuntimeEvents(typeof sinceSeq === 'number' ? sinceSeq : 0);
+  });
+
+  ipcMain.handle('hardboard:buildStart', async (_event, options?: { projectDir?: string; cmakeFile?: string; configFile?: string; sourceFile?: string }) => {
+    return startHardboardBuild(options);
+  });
+
+  ipcMain.handle('hardboard:flashStart', async (_event, options: { projectDir?: string; port: string; artifactFile?: string; configFile?: string }) => {
+    return startHardboardFlash(options);
+  });
+
+  ipcMain.handle('hardboard:readSource', async (_event, targetPath: string) => {
+    return readHardboardSourceFile(targetPath);
   });
 
   ipcMain.handle('hardboard:serialStart', async (_event, options: { port: string; baudRate: number; encoding: string }) => {

@@ -2,6 +2,61 @@
 
 > 当前日志只保留对现代码仍然成立的记录。
 
+## 2026-06-29 — Windows C:\vibeide 0.1 迁移启动
+
+- 按用户要求先写施工文档：`docs/WINDOWS_0_1_MIGRATION_CONSTRUCTION.md`。
+- 已将当前施工成果备份到 `git@github.com:howtion0/vibeide.git`，`main` 更新到本轮 runtime task manager / 仓库导入文件夹 / Windows 迁移施工方案。
+- Electron 应用版本调整为 `0.1.0`，后续 Windows unpacked exe 需要写入 `FileVersion=0.1.0`、`ProductVersion=0.1.0`。
+- 本轮 Windows 目标目录是 `C:\vibeide`，该目录已有上一版本，迁移时覆盖源码但保留依赖、硬件运行态和本地用户文件。
+- 仓库页新增“导入文件夹”入口，默认精选分组之外允许用户把任意本机目录加入仓库视图；导入分组支持移除，移除后不再允许读写该目录；UI 默认分组不再显示施工文档。
+
+## 2026-06-29 — Windows E:\vibeide 0.1 迁移、打包和 ESP32-S3 测试
+
+- Windows 源码项目已镜像到 `E:\vibeide`。
+- Windows unpacked 包已镜像到 `E:\vibeide-0.1-win-unpacked`。
+- 打包 exe：`E:\vibeide-0.1-win-unpacked\奥德赛0.0.exe`。
+- exe PE 版本已验证为 `FileVersion=0.1.0`、`ProductVersion=0.1.0`。
+- Windows 打包版 runtime 环境验证通过：
+  - `npm --prefix runtime run build`
+  - `npm --prefix electron run typecheck`
+  - `npm --prefix electron run build:main`
+  - `npm --prefix electron run build:renderer`
+  - `npm --prefix electron run pack:win`
+- 打包版 runtime 硬件链路验证：
+  - `hardboard:env` 指向 `E:\vibeide-0.1-win-unpacked\resources\runtime` 和 `%LOCALAPPDATA%\vibeide-hardboard-runtime\hardboard`。
+  - `hardboard:devices` 发现 `COM7`、`COM8`、`COM9`。
+  - `COM7` 经 esptool 确认为 ESP32-S3。
+  - `wifi_connect_fmai` 编译通过、烧录到 `COM7` 通过、hash verified。
+  - `hello_world_esp32s3` 编译通过、烧录到 `COM7` 通过、hash verified。
+- 串口剩余问题：
+  - `hardboard:serial` 可打开 `COM7` / `COM8` 并生成日志，但当前未抓到应用层输出。
+  - `COM9` 打开失败，Windows 返回串口超时。
+  - 已写入详细测试报告：`docs/WINDOWS_0_1_TEST_REPORT.md`。
+
+## 2026-06-29 — Runtime UI v2 打包、日志与 asar 验证（历史记录，已被 0.1 E 盘包取代）
+
+- 用户反馈 Linux 预览变化明显，但 Windows unpacked exe 观感未变化，判断风险点是继续打开了旧 `win-unpacked` 目录。
+- 用户继续反馈 `dist-package` 没有变化、exe 版本仍像旧版本；因此最终改为直接刷新原始 `electron/dist-package/win-unpacked`，不再只依赖旁边复制目录。
+- 重新执行并验证：
+  - `npm --prefix electron run typecheck`
+  - `npm --prefix electron run build:renderer`
+  - `npm --prefix runtime run build`
+  - `npm --prefix electron run build:main`
+  - `npm --prefix electron run pack:win`
+  - `npm --prefix electron run stamp:win`
+  - `npm --prefix electron run smoke:workbench`
+- 本轮 Windows unpacked 测试对象改为独立目录，避免与旧目录混淆：
+  - `electron/dist-package/奥德赛0.0-runtime-ui-v2-win-unpacked/奥德赛0.0.exe`
+  - `electron/dist-package/奥德赛0.0-runtime-ui-v2-win-unpacked.zip`
+- 最终用户应测试的原目录也已刷新：
+  - `electron/dist-package/win-unpacked/奥德赛0.0.exe`
+- 新包内写入 `RUNTIME_UI_V2_BUILD.txt`，窗口顶部页签和工作台标题显示 `Runtime UI v2 · 2026-06-29 19:05`。
+- 已解包检查原目录 `resources/app.asar`，确认 renderer bundle 内含 `Runtime UI v2`、`任务管理器`、`编辑器`、`硬件编译/烧录工作台`，main bundle 内含 `resolveSelectedProjectDir`。
+- 已验证原目录 `resources/runtime/dist/hardboard/runner.js` 包含 `failBeforeProcess` 和失败 stderr 写入 `hardboard.build.completed / hardboard.flash.completed`。
+- 新增 `electron/scripts/stamp_win_exe_version.cjs`，用 `resedit` 直接写 `win-unpacked/奥德赛0.0.exe` 的 PE 版本资源；当时历史包 `ProductName=奥德赛0.0`、`FileVersion=0.3.0`、`ProductVersion=0.3.0`。当前 0.1 包以 `docs/WINDOWS_0_1_TEST_REPORT.md` 为准。
+- 新增 `electron/scripts/pack_win_unpacked.cjs`，`npm --prefix electron run pack:win` 在 Linux 上遇到 Wine 签名失败但 `win-unpacked` 已生成时，会继续执行版本资源 stamp 并返回成功，避免再次漏改 exe 文件属性。
+- zip 打包时排除 `runtime/hardboard/events/*`，避免把本机历史运行态事件带进交付目录。
+
 ## 2026-06-22 — log.txt 复盘、Hardboard 工具输出收敛与奥德赛0.0 命名
 
 - 正式项目名确定为：奥德赛0.0。
@@ -81,7 +136,7 @@
 
 ## 2026-06-21 — GitHub 接力与文档重构
 
-- 仓库：
+- 历史仓库：
   - `git@github.com:howtio/vibeide.git`
 - 新增：
   - `docs/INDEX.md`

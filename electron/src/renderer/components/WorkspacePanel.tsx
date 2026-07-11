@@ -4,7 +4,10 @@ import type { WorkbenchItem, WorkbenchOverview, WorkbenchSection } from '../type
 interface Props {
   overview: WorkbenchOverview | null;
   onRefresh: () => void;
+  onImportFolder: () => void;
+  onRemoveImportedFolder: (folderPath: string) => void;
   onOpenItem: (targetPath: string) => void;
+  onEditItem: (item: WorkbenchItem) => void;
 }
 
 function formatTime(value: number | null): string {
@@ -24,7 +27,15 @@ function formatSize(value: number | null): string {
   return `${(value / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function renderSection(section: WorkbenchSection, onOpenItem: (targetPath: string) => void) {
+function isBrowserRunnable(item: WorkbenchItem): boolean {
+  return item.kind === 'file' && /\.(html?|svg)$/i.test(item.name);
+}
+
+function isEditable(item: WorkbenchItem): boolean {
+  return item.kind === 'file' && /(?:CMakeLists\.txt|\.c|\.h|\.cpp|\.hpp|\.S|\.md|\.json|\.txt|\.yaml|\.yml)$/i.test(item.name);
+}
+
+function renderSection(section: WorkbenchSection, onOpenItem: (item: WorkbenchItem) => void, onRemoveImportedFolder: (folderPath: string) => void) {
   return (
     <section key={section.id} className="workspace-section nes-container is-rounded">
       <div className="workspace-section-header">
@@ -32,7 +43,12 @@ function renderSection(section: WorkbenchSection, onOpenItem: (targetPath: strin
           <h3>{section.title}</h3>
           <p>{section.description}</p>
         </div>
-        <code>{section.folderPath}</code>
+        <div className="workspace-section-tools">
+          <code>{section.folderPath}</code>
+          {section.removable ? (
+            <button className="nes-btn is-error" type="button" onClick={() => onRemoveImportedFolder(section.folderPath)}>移除</button>
+          ) : null}
+        </div>
       </div>
       <div className="workspace-items">
         {section.items.length ? section.items.map((item: WorkbenchItem) => (
@@ -40,11 +56,11 @@ function renderSection(section: WorkbenchSection, onOpenItem: (targetPath: strin
             key={item.path}
             type="button"
             className="workspace-item workspace-item-button nes-container is-rounded"
-            onClick={() => onOpenItem(item.path)}
+            onClick={() => onOpenItem(item)}
             title={`打开 ${item.path}`}
             data-workbench-path={item.path}
           >
-            <div className="workspace-item-kind">{item.kind === 'dir' ? 'DIR' : 'FILE'}</div>
+            <div className="workspace-item-kind">{item.kind === 'dir' ? 'DIR' : isBrowserRunnable(item) ? 'RUN' : isEditable(item) ? 'EDIT' : 'FILE'}</div>
             <div className="workspace-item-body">
               <strong title={item.summary || item.label || item.name}>{item.summary || item.label || item.name}</strong>
               <span title={item.detail || item.path}>{item.detail || item.path}</span>
@@ -63,19 +79,35 @@ function renderSection(section: WorkbenchSection, onOpenItem: (targetPath: strin
   );
 }
 
-export default function WorkspacePanel({ overview, onRefresh, onOpenItem }: Props) {
+export default function WorkspacePanel({ overview, onRefresh, onImportFolder, onRemoveImportedFolder, onOpenItem, onEditItem }: Props) {
+  const handleOpenItem = async (item: WorkbenchItem) => {
+    if (window.electronAPI?.isWorkbenchSmokeTest) {
+      onOpenItem(item.path);
+      return;
+    }
+
+    if (item.kind === 'dir' || isBrowserRunnable(item) || !isEditable(item)) {
+      onOpenItem(item.path);
+      return;
+    }
+    onEditItem(item);
+  };
+
   return (
     <div className="workspace-panel">
       <div className="workspace-hero">
         <div>
-          <span className="workspace-eyebrow">Workbench</span>
-          <h2>右侧固定工作台</h2>
-          <p>这里始终保留文件、工具、录制和重放入口。浏览页面改成独立页层，在上方切换，不再把工作台本身覆盖掉。</p>
+          <span className="workspace-eyebrow">Repository</span>
+          <h2>硬件仓库与施工文件</h2>
+          <p>只保留 skills、Agent 生成文件、硬件工程、参考代码和施工文档。HTML 直接运行，源码和 Markdown 可预览修改。</p>
         </div>
-        <button className="nes-btn is-primary" type="button" onClick={onRefresh}>刷新目录</button>
+        <div className="workspace-actions">
+          <button className="nes-btn is-primary" type="button" onClick={onImportFolder}>导入文件夹</button>
+          <button className="nes-btn" type="button" onClick={onRefresh}>刷新目录</button>
+        </div>
       </div>
       <div className="workspace-grid">
-        {overview?.sections.map((section) => renderSection(section, onOpenItem))}
+        {overview?.sections.map((section) => renderSection(section, handleOpenItem, onRemoveImportedFolder))}
       </div>
     </div>
   );

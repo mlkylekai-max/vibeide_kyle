@@ -10,6 +10,7 @@ runtime/pids/
 runtime/logs/
 runtime/state.json
 runtime/ports.json
+runtime/workbench-imports.json
 /state.json
 /ports.json
 runtime/recordings/
@@ -23,6 +24,8 @@ runtime/hardboard/**/dependencies.lock
 runtime/hardboard/**/sdkconfig
 runtime/hardboard/**/wifi_secrets.h
 runtime/hardboard/logs/
+runtime/hardboard/events/
+runtime/tasks/
 runtime/hardboard/esptools/esp-idf-v*/
 runtime/hardboard/esptools/idf-tools/
 workplaces/
@@ -82,3 +85,7 @@ now*.png
 
 # 旧代码（仅项目根）
 /src/
+
+# 构建产物
+win-unpacked.zip
+win-unpacked/
