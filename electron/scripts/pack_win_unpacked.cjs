@@ -3,9 +3,12 @@ const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 
 const electronRoot = path.resolve(__dirname, '..');
+const pkg = JSON.parse(fs.readFileSync(path.join(electronRoot, 'package.json'), 'utf-8'));
 const exePath = path.join(electronRoot, 'dist-package', 'win-unpacked', '奥德赛0.0.exe');
 const builder = path.join(electronRoot, 'node_modules', 'electron-builder', 'cli.js');
 const stamp = path.join(electronRoot, 'scripts', 'stamp_win_exe_version.cjs');
+// PE 版本可使用 pkg.peVersion 指定 4 段版本（如 0.4.0.71618），不填则用 pkg.version
+const peVersion = pkg.peVersion || pkg.version;
 
 const result = spawnSync(process.execPath, [builder, '--win', '--x64', '--dir'], {
   cwd: electronRoot,
@@ -27,7 +30,7 @@ fixHardcodedPaths(path.join(electronRoot, 'dist-package', 'win-unpacked'));
 // ─── 清理构建产物和运行时状态 (减小体积、避免污染) ─────────
 cleanupPackagedOutput(path.join(electronRoot, 'dist-package', 'win-unpacked'));
 
-const stampResult = spawnSync(process.execPath, [stamp, exePath], {
+const stampResult = spawnSync(process.execPath, [stamp, exePath, peVersion], {
   cwd: electronRoot,
   stdio: 'inherit',
   env: process.env,

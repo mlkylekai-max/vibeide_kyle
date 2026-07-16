@@ -1,6 +1,7 @@
 {
   "name": "@vibeide/electron",
-  "version": "0.1.0",
+  "version": "0.4.0",
+  "peVersion": "0.4.0.71618",
   "private": true,
   "main": "dist/main/index.js",
   "scripts": {

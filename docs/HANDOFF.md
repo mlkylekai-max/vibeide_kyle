@@ -13,7 +13,7 @@
 
 ## 当前版本和验证
 
-- Electron package 版本：`0.1.0`。
+- Electron package 版本：`0.4.0`（PE `0.4.0.71618`）。
 - Windows exe PE 版本已验证：
   - `FileVersion=0.1.0`
   - `ProductVersion=0.1.0`

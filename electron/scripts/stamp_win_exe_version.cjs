@@ -8,11 +8,14 @@ const exePath = process.argv[2]
   ? path.resolve(process.argv[2])
   : path.join(electronRoot, 'dist-package', 'win-unpacked', '奥德赛0.0.exe');
 
+// 第二个参数可覆盖 PE 版本号（支持 4 段如 0.4.0.71618），不传则用 package.json 版本
+const peVersion = process.argv[3] || packageJson.version || '0.0.0';
+
 if (!fs.existsSync(exePath)) {
   throw new Error(`exe not found: ${exePath}`);
 }
 
-const version = normalizeVersion(packageJson.version || '0.0.0');
+const version = normalizeVersion(peVersion);
 const productName = '奥德赛0.0';
 const description = '奥德赛0.0 Runtime Workbench';
 
