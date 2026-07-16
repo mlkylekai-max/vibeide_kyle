@@ -20,6 +20,7 @@ type LogEvent =
   | 'first-run:detected' | 'first-run:apikey-saved' | 'first-run:apikey-save-failed' | 'first-run:apikey-copied-from-resources' | 'first-run:apikey-copy-failed' | 'first-run:status'
   | 'mcp:init'
   | 'ui:push'
+  | 'process:uncaught-exception' | 'process:unhandled-rejection'
   | 'browser:navigate' | 'browser:state'
   | 'browser:cookie' | 'browser:storage-flush'
   | 'browser:view-event' | 'browser:window-open' | 'browser:webcontents-created' | 'browser:window-created'

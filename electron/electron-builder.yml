@@ -45,6 +45,8 @@ extraResources:
       - "!esptools/esp-idf-v*/esp-idf/examples/**"
       - "!logs/**"
       - "!events/**"
+      - "!**/state.json"
+      - "!**/ports.json"
   - from: ../scripts
     to: scripts
     filter:

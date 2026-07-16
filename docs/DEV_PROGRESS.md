@@ -58,6 +58,8 @@
 - [x] `agent/skills/espidf_hardboard.md` 已补齐 docsDir/projectsDir、排除 build、先读 `main/CMakeLists.txt` 的文件定位规则
 - [x] Runtime task / pid / eventbus / heartbeat / hardboard build-flash events 已接入任务管理器
 - [x] 编辑器页支持多文件标签，仓库页支持导入和移除文件夹
+- [x] 修复打包版跨机器运行失败：Agent 认证时序、API key 路径、PLAYWRIGHT_BROWSERS_PATH、pyvenv.cfg/esp-idf.pth 硬编码路径
+- [x] 新增全局未捕获异常日志、`fix_win_unpacked.cjs` 独立修复脚本、打包输出自动清理
 - [ ] `hardboard:serial` 在 Windows 0.1 包中能打开端口但未抓到应用层输出，需要后续修复 reset/open 时序
 
 ---

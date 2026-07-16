@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as os from 'os';
 import { flushBrowserStorage, openTabUrl, setupBrowserView, updateBrowserViewBounds } from './browser-view';
 import { startGateway } from './gateway';
 import { logger } from './worker/logger';
@@ -12,9 +13,17 @@ app.commandLine.appendSwitch('remote-debugging-port', '9230');
 app.disableHardwareAcceleration();
 app.commandLine.appendSwitch('disable-gpu-compositing');
 
-// 确保用户数据目录存在
+// 确保用户数据目录存在（包装 try-catch 以防用户名含非 ASCII 字符导致路径创建失败）
 const userDataDir = app.getPath('userData');
-fs.mkdirSync(userDataDir, { recursive: true });
+try {
+  fs.mkdirSync(userDataDir, { recursive: true });
+} catch (err) {
+  // 如果 userData 目录无法创建，尝试降级到 TEMP 目录
+  const fallback = path.join(os.tmpdir(), 'vibeide-userdata');
+  fs.mkdirSync(fallback, { recursive: true });
+  app.setPath('userData', fallback);
+  console.error(`Failed to create userData at ${userDataDir}, using fallback: ${fallback}`, err);
+}
 
 // Chrome profile 放在 userData 下
 const chromeProfileDir = path.join(userDataDir, 'chrome-profile');
@@ -84,15 +93,16 @@ function createWindow() {
   mainWindow.on('leave-full-screen', resyncBrowserBounds);
 
   setupBrowserView(mainWindow);
-  startGateway(mainWindow);
 
-  // 首次启动检查
+  // 首次启动检查 — 必须在 startGateway 之前，确保 API key 已就绪再启动 Agent
   const startupStatus = checkStartupStatus();
   logger.info('first-run:status', startupStatus as unknown as Record<string, unknown>);
 
   // 注册 IPC 处理器
   ipcMain.handle('startup:status', () => startupStatus);
   ipcMain.handle('startup:save-apikey', async (_event, key: string) => saveApiKey(key));
+
+  startGateway(mainWindow);
 
   if (process.env.NODE_ENV === 'development' || process.env.ELECTRON_DEV === '1') {
     mainWindow.loadURL('http://localhost:5173');
@@ -211,5 +221,24 @@ process.on('SIGTERM', () => {
 process.on('SIGINT', () => {
   void shutdownApp('sigint').finally(() => {
     app.exit(0);
+  });
+});
+
+// 全局未捕获异常 — 写入日志以便诊断启动/运行时崩溃
+process.on('uncaughtException', (error) => {
+  logger.error('process:uncaught-exception', {
+    message: error.message,
+    stack: error.stack?.slice(0, 2000) || '',
+  });
+  // 给日志一点时间写入磁盘
+  setTimeout(() => {
+    throw error;
+  }, 500);
+});
+
+process.on('unhandledRejection', (reason) => {
+  logger.error('process:unhandled-rejection', {
+    reason: reason instanceof Error ? reason.message : String(reason),
+    stack: reason instanceof Error ? (reason.stack?.slice(0, 2000) || '') : '',
   });
 });

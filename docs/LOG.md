@@ -2,6 +2,32 @@
 
 > 当前日志只保留对现代码仍然成立的记录。
 
+## 2026-07-16 — 修复打包版跨机器运行失败
+
+- 用户在另一台 Windows 电脑上运行 `win-unpacked\奥德赛0.0.exe` 失败，根因分析：
+  1. **Agent 认证时序错乱** — `createWindow()` 中 `startGateway()`（启动 Agent）在 `checkStartupStatus()`（复制 API key）之前执行，导致首次启动 Agent 拿不到 key，报 `not logged in`。
+  2. **API key 路径不一致** — `getApiKeyPath()` 写死 `%APPDATA%\vibeide\apikey.txt`，但 Electron `userData` 实际是 `%APPDATA%\@vibeide\`（来自 scoped package name `@vibeide/electron`），用户找不到 key 该放哪里。
+  3. **PLAYWRIGHT_BROWSERS_PATH 路径错误** — `buildMcpConfig()` 使用 `getResourcesDir()/playwright`，但 Playwright 浏览器实际在 `resources/runtime/playwright/`，MCP Runtime 无法找到 Chromium。
+  4. **ESP-IDF venv `pyvenv.cfg` 硬编码打包机路径** — `home` 写死为 `D:\vibeide\electron\dist-package\win-unpacked\resources\runtime\python`，目标电脑上路径不同则 Python venv 启动失败。
+  5. **portable Python `esp-idf.pth` 硬编码打包机路径** — 引用 `C:/vibeide-hw/...`，目标电脑不存在。
+
+- 修复 (`electron/src/main/`)：
+  - `index.ts`：`checkStartupStatus()` 移到 `startGateway()` 之前；添加全局 `uncaughtException`/`unhandledRejection` 处理器；userData 创建失败时降级到 TEMP 目录
+  - `paths.ts`：`getApiKeyPath()` 改用 `app.getPath('userData')`，统一为 `%APPDATA%\@vibeide\apikey.txt`
+  - `agent.ts`：`PLAYWRIGHT_BROWSERS_PATH` 从 `getResourcesDir()` 改为 `path.join(runtimeDir, 'playwright')`
+  - `worker/logger.ts`：添加 `process:uncaught-exception`、`process:unhandled-rejection` 事件类型
+
+- 修复 (`electron/`)：
+  - `electron-builder.yml`：hardboard filter 增加排除 `state.json`、`ports.json`
+  - `scripts/pack_win_unpacked.cjs`：新增打包后路径修正（pyvenv.cfg relative home、esp-idf.pth relative paths、清理运行时残留文件）
+  - `scripts/fix_win_unpacked.cjs`：新增独立修复脚本，可对已有 `win-unpacked` 目录修正硬编码路径而无需重新打包
+
+- 文档漂移修正：
+  - `docs/HANDOFF.md`：日期更新到 2026-07-16；API key 路径修正为 `%APPDATA%\@vibeide\apikey.txt`；补充跨机器打包修复条目
+  - 备份分支：`backup/20260716-before-packaging-fix`
+
+- 验证：`npx tsc --noEmit` 通过
+
 ## 2026-07-11 — 修复打包版 exe ESP-IDF 编译三问题（中文路径 / Python venv / 约束文件）
 
 - 发现并修复打包版 `奥德赛0.0.exe` 编译 ESP-IDF 工程的三大问题：

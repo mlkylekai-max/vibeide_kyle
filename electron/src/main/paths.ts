@@ -111,12 +111,8 @@ export function getApiKeyPath(): string {
   if (isDev()) {
     return path.join(devProjectRoot(), 'apikey.txt');
   }
-  // 使用 app.getPath('userData') 但不要被后续的 setPath 影响
-  // 这里使用固定的 base path
-  const base = app.isReady()
-    ? app.getPath('appData')
-    : process.env.APPDATA || path.join(require('os').homedir(), 'AppData', 'Roaming');
-  return path.join(base, 'vibeide', 'apikey.txt');
+  // 使用 userData 目录（%APPDATA%/@vibeide），与其他运行时数据放在一起
+  return path.join(app.getPath('userData'), 'apikey.txt');
 }
 
 /** 运行时数据目录（recordings、workflows、logs 等） */

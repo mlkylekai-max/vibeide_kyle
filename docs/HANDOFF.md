@@ -4,11 +4,11 @@
 
 ## 当前事实
 
-- 当前日期：2026-07-11。
+- 当前日期：2026-07-16。
 - 正式产品名：奥德赛0.0。
 - 内部工程代号：`vibeide`。
 - 当前本机工作目录：`D:\vibeide`（Windows 实机）。
-- 备份 GitHub：`git@github.com:howtion0/vibeide.git`，`main` 已推到 `3e6d5da`。
+- 备份 GitHub：`git@github.com:howtion0/vibeide.git`，`main` 已推到 `63820a3`。
 - 旧 GitHub/历史源：`git@github.com:howtio/vibeide.git` 仍可能出现在旧文档或 remote 里，当前接力优先以 `howtion0/vibeide` 的备份结果为准。
 
 ## 当前版本和验证
@@ -19,7 +19,7 @@
   - `ProductVersion=0.1.0`
 - 本机源码目录：`D:\vibeide`
 - 打包 exe 位置：`D:\vibeide\electron\dist-package\win-unpacked\奥德赛0.0.exe`
-- 产线 API key：`%APPDATA%\vibeide\apikey.txt`（DeepSeek）
+- 产线 API key：`%APPDATA%\@vibeide\apikey.txt`（DeepSeek）
 - 仓库 remote：`git@github.com:howtion0/vibeide.git`
 - SSH key：`~/.ssh/id_ed25519`，已配置 `git config core.sshCommand` 绕过中文路径编码问题
 
@@ -36,6 +36,16 @@
   - Python venv 绑定旧机器 HP 路径 → 优先系统 Python
   - 缺少 `espidf.constraints` → 运行时自动生成
   - 便携 Python 3.12.9 + ESP-IDF 56 依赖包已装好
+- **修复打包版跨机器运行问题**（2026-07-16）：
+  - Agent 认证时序：`checkStartupStatus()` 移到 `startGateway()` 之前，确保 API key 先就绪再启动 Agent
+  - API key 路径统一：`getApiKeyPath()` 改用 `userData`（`%APPDATA%\@vibeide\apikey.txt`），与其他运行时数据同目录
+  - `PLAYWRIGHT_BROWSERS_PATH` 修正：从错误的 `resources/playwright` 改为 `resources/runtime/playwright`（MCP 浏览器操作依赖）
+  - ESP-IDF Python venv `pyvenv.cfg` 的 `home` 路径从打包机绝对路径改为相对路径，使 venv Python 可在任意目录运行
+  - portable Python `esp-idf.pth` 重写为相对路径，不再引用打包机 `C:/vibeide-hw/` 路径
+  - 打包输出自动清理运行时残留文件（`state.json`、`logs/`、`chrome_profile/` 等）
+  - 新增全局 `uncaughtException` / `unhandledRejection` 处理器，启动崩溃写入日志
+  - 新增 `electron/scripts/fix_win_unpacked.cjs`：无需重新打包即可修复已有 `win-unpacked` 目录的硬编码路径
+  - 新增备份分支：`backup/20260716-before-packaging-fix`
 
 已通过（历史 E 盘验证）：
 

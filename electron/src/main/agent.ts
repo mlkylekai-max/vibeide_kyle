@@ -203,7 +203,8 @@ function buildMcpConfig(): { mcpServers: Record<string, unknown> } {
   const prodServerEntry = getRuntimeServerEntry();
 
   // 所有模式都传入 RUNTIME_ROOT + PLAYWRIGHT 环境变量
-  const playwrightDir = path.join(getResourcesDir(), 'playwright');
+  // playwright 浏览器通过 extraResources 放在 runtime/playwright/，不是 resources/playwright/
+  const playwrightDir = path.join(runtimeDir, 'playwright');
   const baseEnv: Record<string, string> = {
     CDP_PORT: '9230',
     RUNTIME_ROOT: runtimeDir,
